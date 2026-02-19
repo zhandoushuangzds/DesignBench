@@ -1,0 +1,9 @@
+name: alphafold3
+af3_exec: /nfs_share/qtfeng/fold/ref/af3_data/af3/run_af3_5880.sh
+run_data_pipeline: true
+exp_name: test
+num_workers: 8
+cache_dir: 
+unpaired_msa_cache: 
+paired_msa_cache: 
+template_cache: 

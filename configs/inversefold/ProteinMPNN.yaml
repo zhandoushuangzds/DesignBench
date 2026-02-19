@@ -1,0 +1,8 @@
+exec: inversefold/LigandMPNN/run.py
+model_type: protein_mpnn
+checkpoint_path: /nfs_share/qtfeng/design/ref/LigandMPNN/model_params/proteinmpnn_v_48_020.pt
+batch_size: 4
+number_of_batches: 1
+temperature: 0.1
+seed: 0
+parse_atoms_with_zero_occupancy: 1

@@ -1,0 +1,8 @@
+exec: inversefold/LigandMPNN/run.py
+model_type: ligand_mpnn
+checkpoint_path: /home/nvme04/qtfeng/design/benchmark/dev/20251231/benchmark_new/inversefold/LigandMPNN/model_params/ligandmpnn_v_32_010_25.pt
+batch_size: 2
+number_of_batches: 1
+temperature: 0.1
+seed: 0
+parse_atoms_with_zero_occupancy: 1

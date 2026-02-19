@@ -1,0 +1,15 @@
+defaults:
+  - refold: alphafold3
+  - inversefold: InverseFold
+  - metrics: nucleotide_metrics
+
+# design_dir: /home/nvme04/qtfeng/design/design/dev/20260104/odesign/outputs/designbenchmark/20260104/flex-v1.1-28399/na/rna_bb
+# design_dir: /home/nvme04/qtfeng/design/design/dev/20260104/odesign/outputs/designbenchmark/20260104/flex-v2.1-28799/na/rna_bb
+# design_dir: /home/nvme04/qtfeng/design/design/dev/20260104/odesign/outputs/designbenchmark/20260104/rigid-v1.1-20399/na/rna_bb
+design_dir: /home/nvme04/qtfeng/design/design/dev/20260107/odesign/outputs/designbenchmark/20260113/flex-v2.1-28799/na/rna_bb
+root: results
+gpus: 2
+
+hydra:
+  run:
+    dir: /home/nvme04/qtfeng/design/design/dev/20260107/odesign/outputs/designbenchmark/20260113/flex-v2.1-28799/na/rna_bb_output

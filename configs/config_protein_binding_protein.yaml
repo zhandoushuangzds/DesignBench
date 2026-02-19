@@ -1,0 +1,12 @@
+defaults:
+  - refold: alphafold3
+  - inversefold: ProteinMPNN
+  - metrics: protein_binding_protein
+
+design_dir: /nfs_share/qtfeng/design/dev/20260116/ODesign_benchmark/examples/ODesign/protein_binding_protein
+root: results
+gpus: 2,3
+
+hydra:
+  run:
+    dir: /nfs_share/qtfeng/design/dev/20260116/ODesign_benchmark/examples/ODesign/protein_binding_protein_test_2

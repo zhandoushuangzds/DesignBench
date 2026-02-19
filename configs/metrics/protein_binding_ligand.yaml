@@ -1,0 +1,7 @@
+name: ligand_metrics
+babel_libdir: /home/nvme01/miniforge3/envs/odesign_benchmark/lib/openbabel/3.1.0
+cuda_device: 0
+verbose: true
+ccd_bond_length_path: /home/nvme04/qtfeng/design/benchmark/dev/20251231/benchmark_new/evaluation/metrics/ligand/geometry/ccd_bond_length_distribution.npy
+ccd_bond_angle_path: /home/nvme04/qtfeng/design/benchmark/dev/20251231/benchmark_new/evaluation/metrics/ligand/geometry/ccd_bond_angle_distribution.npy
+ccd_torsion_angle_path: /home/nvme04/qtfeng/design/benchmark/dev/20251231/benchmark_new/evaluation/metrics/ligand/geometry/ccd_torsion_angle_distribution.npy

@@ -1,0 +1,12 @@
+defaults:
+  - refold: chai
+  - inversefold: LigandMPNN
+  - metrics: protein_binding_protein
+
+design_dir: /data/ht/qtfeng/ref/boltzgen/benchmark_results/ligand_entity
+root: results
+gpus: 6,7
+
+hydra:
+  run:
+    dir: outputs/boltzgen/ligand_binding_protein

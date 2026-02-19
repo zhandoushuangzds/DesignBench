@@ -1,0 +1,3 @@
+ccd_component: preprocess/ccd_component/components.cif
+num_workers: 8
+num_diffn_samples: 1

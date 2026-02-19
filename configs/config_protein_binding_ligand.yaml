@@ -1,0 +1,17 @@
+defaults:
+  - inversefold: InverseFold_pbl
+  - metrics: protein_binding_ligand
+
+# design_dir: examples/ODesign/protein_binding_ligand/oqo
+# design_dir: /home/nvme04/qtfeng/design/design/dev/20260104/odesign/outputs/designbenchmark/20260104/flex-v1.1-28399/ligand/protein_binding_ligand
+# design_dir: /home/nvme04/qtfeng/design/design/dev/20260104/odesign/outputs/designbenchmark/20260104/flex-v2.1-28799/ligand/protein_binding_ligand
+# design_dir: /home/nvme04/qtfeng/design/design/dev/20260104/odesign/outputs/designbenchmark/20260104/rigid-v1.1-20399/ligand/protein_binding_ligand
+design_dir: /home/nvme04/qtfeng/design/design/dev/20260107/odesign/outputs/designbenchmark/20260113/flex-v2.1-28799/ligand/protein_binding_ligand
+# design_dir: /home/nvme04/qtfeng/design/benchmark/dev/20251231/benchmark_new/examples/ODesign/ligand_binding_protein/ligand_binding_protein_test/seed_101/predictions
+root: results
+gpus: 0
+# gpus: 6,7
+
+hydra:
+  run:
+    dir: /home/nvme04/qtfeng/design/design/dev/20260107/odesign/outputs/designbenchmark/20260113/flex-v2.1-28799/ligand/protein_binding_ligand_output

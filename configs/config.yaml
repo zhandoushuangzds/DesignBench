@@ -1,0 +1,12 @@
+defaults:
+  - refold: alphafold3
+  - inversefold: LigandMPNN
+  - metrics: protein_binding_protein
+
+design_dir: /home/wang_qinghan/wang_yilin/workspace/rfantibody/data/outputs
+root: results
+gpus: 2,3,4,5,6,7
+
+hydra:
+  run:
+    dir: output/rfantibody

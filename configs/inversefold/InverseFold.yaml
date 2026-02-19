@@ -1,0 +1,6 @@
+data_name: rna
+temp: 0.9
+topk: 4
+use_beam: true
+save_all: true
+model_dir: /home/nvme04/qtfeng/design/benchmark/dev/20251231/benchmark_new/inversefold/InverseFold/ckpts
