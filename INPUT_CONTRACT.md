@@ -76,61 +76,105 @@ design_dir/
 **Directory Structure:**
 ```
 design_dir/
-├── target1-scaffold1-1.pdb  (or .cif)
-├── target1-scaffold1-2.pdb
+├── 01_PDL1_0.pdb
+├── 01_PDL1_1.pdb
 ├── ...
-├── target1-scaffold1-100.pdb
-├── target2-scaffold1-1.pdb
-└── ...
+├── 01_PDL1_99.pdb
+├── 02_TNFA_0.pdb
+├── ...
+└── 22_FHAB_99.pdb
 ```
 
-**Naming Convention:**
-- Format: `{target}:{scaffold}-{design_number}.pdb`
-- Example: `target1:scaffold1-1.pdb`, `target1:scaffold1-2.pdb`
-- Supports both `:` and `-` as separators
+**Strict Naming Convention (Benchmark Requirement):**
+- **Format**: `{TargetName}_{Index}.pdb` or `{TargetName}_{Index}.cif`
+- **TargetName Format**: `{序号}_{四位大写ID}` (e.g., `01_PDL1`, `12_AMBP`)
+- **Index**: Design number starting from 0 (0, 1, 2, ..., 99)
+- **Examples**: 
+  - `01_PDL1_0.pdb` (Part 1, target PDL1, design 0)
+  - `12_AMBP_42.pdb` (Part 2, target AMBP, design 42)
+  - `22_FHAB_99.pdb` (Part 2, target FHAB, design 99)
+
+**Target List:**
+- **Part 1 (01-11)**: Benchmark validation group (fixed scaffold requirement)
+  - `01_PDL1`, `02_TNFA`, `03_PDGF`, `04_IL7R`, `05_INSR`, `06_H1HA`, `07_RSV1`, `08_RSV3`, `09_RBDS`, `10_IL10`, `11_BLAC`
+- **Part 2 (12-22)**: Challenge group (allows scaffold diversity)
+  - `12_AMBP`, `13_GM2A`, `14_HNMT`, `15_IDI2`, `16_MZB1`, `17_ORM2`, `18_PHYH`, `19_PMVK`, `20_RFK`, `21_PPOX`, `22_FHAB`
+
+**Quota Limits:**
+- **Maximum 100 designs per target** (indices 0-99)
+- If more than 100 designs are found for a target, pipeline will raise an error
+- Designs are sorted by index and only the first 100 are processed
 
 **Requirements:**
 - ✅ PDB or CIF format files
-- ✅ Antibody structures (Heavy + Light chains, or Nanobody)
+- ✅ Antibody structures (Heavy + Light chains for scFv/Fab, or Heavy only for VHH/Nanobody)
 - ✅ Real residue names
 - ✅ **Required**: CDR information CSV
+- ✅ **Required**: Strict filename format compliance
+- ✅ **Required**: Target name validation
+
+**Module Selection:**
+- **AntibodyDesignModule** (scFv/Fab): Full antibodies with heavy and light chains
+- **NanobodyDesignModule** (VHH): Nanobodies with heavy chain only (no light chain)
+- Set `antibody_type: 'antibody'` or `antibody_type: 'nanobody'` in config
 
 **Required Metadata: `cdr_info_csv`**
 
 **Must provide** a CSV with CDR indices for each antibody. This CSV is used for:
-1. **Inverse Folding**: Fixing scaffold residues (all residues EXCEPT CDR loops)
-2. **Developability Evaluation**: Calculating developability metrics
+1. **Input Validation**: Matching PDB files to CDR information (pipeline stops if match fails)
+2. **Inverse Folding**: Fixing scaffold residues (all residues EXCEPT CDR loops)
+3. **Developability Evaluation**: Calculating developability metrics
 
 **CSV Format:**
 ```csv
 id,heavy_fv,light_fv,h_cdr1_start,h_cdr1_end,h_cdr2_start,h_cdr2_end,h_cdr3_start,h_cdr3_end,l_cdr1_start,l_cdr1_end,l_cdr2_start,l_cdr2_end,l_cdr3_start,l_cdr3_end
-target1:scaffold1,H,L,30,35,50,65,95,102,24,34,50,56,89,97
-target2:scaffold1,H,,30,35,50,65,95,102,,,,,,
-target1:scaffold2,H,L,30,35,50,65,95,102,24,34,50,56,89,97
+01_PDL1,H,L,30,35,50,65,95,102,24,34,50,56,89,97
+02_TNFA,H,L,30,35,50,65,95,102,24,34,50,56,89,97
+12_AMBP,H,,30,35,50,65,95,102,,,,,,
 ```
 
 **Column Descriptions:**
-- `id`: Identifier matching PDB filename (supports "target:scaffold" format)
+- `id`: **Must match target name** (e.g., `01_PDL1`, `12_AMBP`) - used for PDB file matching
 - `heavy_fv`: Heavy chain ID (typically 'H')
-- `light_fv`: Light chain ID (typically 'L', empty for nanobodies)
+- `light_fv`: Light chain ID (typically 'L', empty for nanobodies/VHH)
 - `h_cdr1_start`, `h_cdr1_end`: Heavy chain CDR1 range (1-based, inclusive)
 - `h_cdr2_start`, `h_cdr2_end`: Heavy chain CDR2 range (1-based, inclusive)
 - `h_cdr3_start`, `h_cdr3_end`: Heavy chain CDR3 range (1-based, inclusive)
-- `l_cdr1_start`, `l_cdr1_end`: Light chain CDR1 range (optional, for nanobodies)
-- `l_cdr2_start`, `l_cdr2_end`: Light chain CDR2 range (optional, for nanobodies)
-- `l_cdr3_start`, `l_cdr3_end`: Light chain CDR3 range (optional, for nanobodies)
+- `l_cdr1_start`, `l_cdr1_end`: Light chain CDR1 range (optional, for nanobodies must be empty)
+- `l_cdr2_start`, `l_cdr2_end`: Light chain CDR2 range (optional, for nanobodies must be empty)
+- `l_cdr3_start`, `l_cdr3_end`: Light chain CDR3 range (optional, for nanobodies must be empty)
 
 **CDR-Based Scaffold Fixing:**
 - During inverse folding, **all residues EXCEPT the 3 CDR loops are fixed**
 - This ensures only CDR regions are redesigned, keeping the scaffold constant
-- Matching is done by PDB filename (supports "target:scaffold" format)
+- Matching is done by extracting target name from PDB filename (e.g., `01_PDL1_0.pdb` → `01_PDL1`)
+
+**Scaffold Whitelist & Compliance:**
+- **Antibody Whitelist**: 1FVC, 6CR1, 5Y9K, 6WGB, 5YOY, 4M6M, 5UDC, 8IOW, 6WIO, 5J13, 5L6Y, 3HMW, 3H42, 6B3S, 5VZY
+- **Nanobody Whitelist**: 3EAK, 7EOW, 7XL0, 8COH, 8Z8V
+- **Part 1 Compliance**: Each target must use a single standard scaffold (Antibody: 1FVC, Nanobody: 3EAK)
+- **Part 2 Compliance**: Scaffolds must be in whitelist, diversity ≥ 3 recommended
+- Pipeline performs pre-run compliance audit and generates a report
+
+**Pre-Run Compliance Report:**
+The pipeline automatically generates a compliance report before execution:
+```
+Sequence | Target | Scaffold | Count | Status
+01        | 01_PDL1 | 1FVC    | 100   | Pass
+12        | 12_AMBP | 3EAK,7EOW,8COH | 100 | Pass
+```
+- **Status**: Pass (compliant) or Warning (non-compliant)
+- Warnings are listed separately with detailed explanations
+- Pipeline can be configured to stop on warnings (`proceed_with_warnings: false`) or continue (`proceed_with_warnings: true`)
 
 **Pipeline:**
-1. Preprocess: Format designs → `formatted_designs/`
-2. Inverse Fold: LigandMPNN → `inverse_fold/`
-3. Refold: AlphaFold3 → `refold/af3_out/`
-4. Evaluate: `run_protein_binding_protein_evaluation()`
-5. Developability: `run_antibody_developability_evaluation()` (if `cdr_info_csv` provided)
+1. **Input Audit**: Validate filenames, target names, CDR matching, quotas, scaffold compliance
+2. **Compliance Report**: Generate and display pre-run compliance report
+3. Preprocess: Format designs → `formatted_designs/`
+4. Inverse Fold: LigandMPNN (with CDR-based scaffold fixing) → `inverse_fold/`
+5. Refold: AlphaFold3 → `refold/af3_out/`
+6. Evaluate: `run_protein_binding_protein_evaluation()`
+7. Developability: `run_antibody_developability_evaluation()` (uses CDR info from CSV)
 
 ---
 
@@ -369,7 +413,7 @@ If validation fails, BenchCore will raise clear error messages indicating what i
 |-----------|-------------|----------|--------------|--------|
 | Protein | PDB | None | ProteinMPNN | ESMFold |
 | PBP | PDB | None | LigandMPNN | AF3 |
-| Antibody | PDB/CIF | CDR CSV (opt) | LigandMPNN | AF3 |
+| Antibody | PDB/CIF | CDR CSV (req) | LigandMPNN | AF3 |
 | PBL | CIF | None | LigandMPNN | Chai-1 |
 | NUC | CIF | None | ODesign | AF3 |
 | NBL | CIF | None | ODesign | AF3 |
@@ -392,12 +436,42 @@ python scripts/run_protein_pipeline.py \
 
 ### Example 2: Antibody Design with Developability
 ```bash
+# scFv/Fab (full antibody)
 python scripts/run_antibody_pipeline.py \
     design_dir=/path/to/antibodies \
+    antibody_type=antibody \
     inversefold=LigandMPNN \
     refold=af3 \
     cdr_info_csv=/path/to/cdr_info.csv \
+    max_designs_per_target=100 \
+    proceed_with_warnings=false \
     gpus=0,1
+
+# VHH (nanobody)
+python scripts/run_antibody_pipeline.py \
+    design_dir=/path/to/nanobodies \
+    antibody_type=nanobody \
+    inversefold=LigandMPNN \
+    refold=af3 \
+    cdr_info_csv=/path/to/cdr_info.csv \
+    max_designs_per_target=100 \
+    proceed_with_warnings=false \
+    gpus=0,1
+```
+
+**Input File Naming Examples:**
+- Valid: `01_PDL1_0.pdb`, `01_PDL1_1.pdb`, ..., `01_PDL1_99.pdb`
+- Valid: `12_AMBP_0.pdb`, `12_AMBP_1.pdb`, ..., `12_AMBP_99.pdb`
+- Invalid: `PDL1_0.pdb` (missing sequence number)
+- Invalid: `01_pdl1_0.pdb` (target ID must be uppercase)
+- Invalid: `01_PDL1_100.pdb` (exceeds quota of 100)
+
+**CDR CSV Example:**
+```csv
+id,heavy_fv,light_fv,h_cdr1_start,h_cdr1_end,h_cdr2_start,h_cdr2_end,h_cdr3_start,h_cdr3_end,l_cdr1_start,l_cdr1_end,l_cdr2_start,l_cdr2_end,l_cdr3_start,l_cdr3_end
+01_PDL1,H,L,30,35,50,65,95,102,24,34,50,56,89,97
+02_TNFA,H,L,30,35,50,65,95,102,24,34,50,56,89,97
+12_AMBP,H,,30,35,50,65,95,102,,,,,,
 ```
 
 ### Example 3: Motif Scaffolding

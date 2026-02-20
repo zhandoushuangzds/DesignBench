@@ -8,7 +8,7 @@ import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple, Callable
 from biotite.structure.io import pdb, pdbx
 import biotite.structure as struc
 import biotite.structure.io as io
@@ -127,8 +127,17 @@ class InverseFold:
 
         self.config = config
 
-    def run_ligandmpnn_distributed(self, input_dir: Path, output_dir: str, gpu_list: list, origin_cwd: str, 
-                                    cdr_info_csv: Optional[str] = None, use_cdr_fix: bool = False):
+    def run_ligandmpnn_distributed(
+        self, 
+        input_dir: Path, 
+        output_dir: str, 
+        gpu_list: list, 
+        origin_cwd: str, 
+        cdr_info_csv: Optional[str] = None, 
+        use_cdr_fix: bool = False,
+        fixed_residues_calculator: Optional[Callable[[Path, Any], List[str]]] = None,
+        cdr_df: Optional[Any] = None
+    ):
         """
         Run LigandMPNN in distributed mode.
         
@@ -137,31 +146,36 @@ class InverseFold:
             output_dir: Output directory for results
             gpu_list: List of GPU IDs
             origin_cwd: Original working directory
-            cdr_info_csv: Path to CDR info CSV (required if use_cdr_fix=True)
+            cdr_info_csv: Path to CDR info CSV (required if use_cdr_fix=True and cdr_df=None)
             use_cdr_fix: If True, use CDR information to fix scaffold residues (for antibodies)
+            fixed_residues_calculator: Optional function to calculate fixed residues (pdb_path, cdr_row) -> List[str]
+            cdr_df: Optional pre-loaded CDR DataFrame (if None, will load from cdr_info_csv)
         """
         os.makedirs(output_dir, exist_ok=True)
         my_env = os.environ.copy()
         ligandmpnn_multi_input = {}
         
         # Load CDR info if provided
-        cdr_df = None
-        if use_cdr_fix:
+        if use_cdr_fix and cdr_df is None:
             if cdr_info_csv is None:
-                raise ValueError("cdr_info_csv is required when use_cdr_fix=True")
-            from .cdr_utils import load_cdr_info_csv, match_pdb_to_cdr_info, calculate_fixed_residues_for_antibody
+                raise ValueError("cdr_info_csv is required when use_cdr_fix=True and cdr_df is not provided")
+            from .cdr_utils import load_cdr_info_csv, match_pdb_to_cdr_info
             cdr_df = load_cdr_info_csv(cdr_info_csv)
             print(f"Loaded CDR info for {len(cdr_df)} antibodies")
         
+        # Use provided calculator or default
+        if fixed_residues_calculator is None and use_cdr_fix:
+            from .cdr_utils import calculate_fixed_residues_for_antibody
+            fixed_residues_calculator = calculate_fixed_residues_for_antibody
+        
         for pdb_path in input_dir.rglob("*.pdb"):
-            if use_cdr_fix and cdr_df is not None:
+            if use_cdr_fix and cdr_df is not None and fixed_residues_calculator is not None:
                 # Use CDR information to calculate fixed residues
+                from .cdr_utils import match_pdb_to_cdr_info
                 cdr_row = match_pdb_to_cdr_info(pdb_path, cdr_df)
                 if cdr_row is not None:
                     try:
-                        fixed_residues = calculate_fixed_residues_for_antibody(
-                            pdb_path, cdr_row
-                        )
+                        fixed_residues = fixed_residues_calculator(pdb_path, cdr_row)
                         fixed_residues_str = " ".join(fixed_residues)
                         ligandmpnn_multi_input[str(pdb_path.parent / f"{pdb_path.stem.lower()}.pdb")] = fixed_residues_str
                         print(f"Fixed {len(fixed_residues)} scaffold residues for {pdb_path.name} (CDR-based)")

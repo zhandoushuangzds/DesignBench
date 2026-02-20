@@ -218,7 +218,7 @@ def match_pdb_to_cdr_info(pdb_path: Path, cdr_df: pd.DataFrame) -> Optional[pd.S
     Match a PDB file to its CDR information row.
     
     Matching strategy:
-    1. Extract base name from PDB path (e.g., "target-scaffold-1.pdb" -> "target-scaffold")
+    1. Extract target name from PDB path (e.g., "01_PDL1_0.pdb" -> "01_PDL1")
     2. Try to match with 'id' column in CDR CSV
     3. Support "target:scaffold" format in CSV
     
@@ -229,16 +229,26 @@ def match_pdb_to_cdr_info(pdb_path: Path, cdr_df: pd.DataFrame) -> Optional[pd.S
     Returns:
         Series with CDR information for this PDB, or None if not found
     """
-    # Extract base name from PDB path
-    # Format: "target-scaffold-1.pdb" or "target_scaffold_1.pdb"
+    import re
+    
+    # Extract target name from PDB path
+    # Format: "01_PDL1_0.pdb" or "01_PDL1_scaffold_0.pdb"
     pdb_stem = pdb_path.stem  # Without extension
     
-    # Remove trailing numbers and separators (e.g., "-1", "_1")
-    import re
-    base_name = re.sub(r'[-_]?\d+$', '', pdb_stem)
+    # Pattern: {序号}_{四位大写ID}_{可选scaffold}_{索引}
+    # We want to extract: {序号}_{四位大写ID}
+    pattern = r'^(\d{2}_[A-Z0-9]{4,})'
+    match = re.match(pattern, pdb_stem)
+    
+    if match:
+        target_name = match.group(1)
+    else:
+        # Fallback: try to extract base name
+        base_name = re.sub(r'[-_]?\d+$', '', pdb_stem)
+        target_name = base_name
     
     # Try exact match first
-    matches = cdr_df[cdr_df['id'] == base_name]
+    matches = cdr_df[cdr_df['id'] == target_name]
     if len(matches) > 0:
         return matches.iloc[0]
     
@@ -246,18 +256,21 @@ def match_pdb_to_cdr_info(pdb_path: Path, cdr_df: pd.DataFrame) -> Optional[pd.S
     # If CSV has "target:scaffold" format, try matching
     for idx, row in cdr_df.iterrows():
         csv_id = str(row['id'])
+        # Check if CSV ID starts with target name
+        if csv_id.startswith(target_name):
+            return row
         # Check if CSV ID matches (with or without colon)
-        if csv_id.replace(':', '-') == base_name or csv_id.replace(':', '_') == base_name:
+        if csv_id.replace(':', '-') == target_name or csv_id.replace(':', '_') == target_name:
             return row
         
-        # Also try reverse: if base_name has colon, try matching
+        # Also try reverse: if target_name has colon, try matching
         if ':' in csv_id:
-            csv_base = csv_id.split(':')[0] + '-' + csv_id.split(':')[1]
-            if csv_base == base_name:
+            csv_base = csv_id.split(':')[0] + '_' + csv_id.split(':')[1].split('_')[0] if '_' in csv_id.split(':')[1] else csv_id.split(':')[0]
+            if csv_base == target_name:
                 return row
     
     # If still no match, try partial match
-    if base_name in cdr_df['id'].values:
-        return cdr_df[cdr_df['id'] == base_name].iloc[0]
+    if target_name in cdr_df['id'].values:
+        return cdr_df[cdr_df['id'] == target_name].iloc[0]
     
     return None
