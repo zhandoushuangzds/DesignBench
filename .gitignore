@@ -1,2 +1,12 @@
 algorithms/odesign/InverseFold/ckpts/
 refold/esmfold/weights/
+
+venv/
+.env
+__pycache__/
+*.py[cod]
+
+.DS_Store
+.vscode/
+.idea/
+.cursorrules

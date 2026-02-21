@@ -87,7 +87,7 @@ design_dir/
 
 **Strict Naming Convention (Benchmark Requirement):**
 - **Format**: `{TargetName}_{Index}.pdb` or `{TargetName}_{Index}.cif`
-- **TargetName Format**: `{序号}_{四位大写ID}` (e.g., `01_PDL1`, `12_AMBP`)
+- **TargetName Format**: `{Numerical_Order}_{Four_Capital_Letters_ID}` (e.g., `01_PDL1`, `12_AMBP`)
 - **Index**: Design number starting from 0 (0, 1, 2, ..., 99)
 - **Examples**: 
   - `01_PDL1_0.pdb` (Part 1, target PDL1, design 0)
