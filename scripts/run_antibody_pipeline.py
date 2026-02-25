@@ -38,13 +38,18 @@ def main(cfg: DictConfig):
     # Determine antibody type (scFv/Fab or VHH)
     antibody_type = cfg.get('antibody_type', 'antibody').lower()  # 'antibody' or 'nanobody'
     
+    # Get target config path
+    target_config_path = cfg.get('target_config_path', None)
+    if target_config_path:
+        target_config_path = os.path.join(get_original_cwd(), target_config_path) if not os.path.isabs(target_config_path) else target_config_path
+    
     if antibody_type == 'nanobody':
-        design_module = NanobodyDesignModule(cfg)
+        design_module = NanobodyDesignModule(cfg, target_config_path=target_config_path)
         print("=" * 80)
         print("NANOBODY (VHH) DESIGN MODULE")
         print("=" * 80)
     else:
-        design_module = AntibodyDesignModule(cfg)
+        design_module = AntibodyDesignModule(cfg, target_config_path=target_config_path)
         print("=" * 80)
         print("ANTIBODY (scFv/Fab) DESIGN MODULE")
         print("=" * 80)

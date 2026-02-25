@@ -235,8 +235,8 @@ def match_pdb_to_cdr_info(pdb_path: Path, cdr_df: pd.DataFrame) -> Optional[pd.S
     # Format: "01_PDL1_0.pdb" or "01_PDL1_scaffold_0.pdb"
     pdb_stem = pdb_path.stem  # Without extension
     
-    # Pattern: {序号}_{四位大写ID}_{可选scaffold}_{索引}
-    # We want to extract: {序号}_{四位大写ID}
+    # Pattern: {sequence_number}_{target_id}_{optional_scaffold}_{index}
+    # We want to extract: {sequence_number}_{target_id}
     pattern = r'^(\d{2}_[A-Z0-9]{4,})'
     match = re.match(pattern, pdb_stem)
     

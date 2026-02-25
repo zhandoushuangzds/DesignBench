@@ -90,15 +90,19 @@ design_dir/
 - **TargetName Format**: `{Numerical_Order}_{Four_Capital_Letters_ID}` (e.g., `01_PDL1`, `12_AMBP`)
 - **Index**: Design number starting from 0 (0, 1, 2, ..., 99)
 - **Examples**: 
-  - `01_PDL1_0.pdb` (Part 1, target PDL1, design 0)
-  - `12_AMBP_42.pdb` (Part 2, target AMBP, design 42)
-  - `22_FHAB_99.pdb` (Part 2, target FHAB, design 99)
+  - `01_7UXQ_0.pdb` (Part 1, target 7UXQ, design 0)
+  - `12_1BI7_42.pdb` (Part 2, target 1BI7, design 42)
+  - `22_7WPC_99.pdb` (Part 1, target 7WPC, design 99)
 
 **Target List:**
-- **Part 1 (01-11)**: Benchmark validation group (fixed scaffold requirement)
-  - `01_PDL1`, `02_TNFA`, `03_PDGF`, `04_IL7R`, `05_INSR`, `06_H1HA`, `07_RSV1`, `08_RSV3`, `09_RBDS`, `10_IL10`, `11_BLAC`
-- **Part 2 (12-22)**: Challenge group (allows scaffold diversity)
-  - `12_AMBP`, `13_GM2A`, `14_HNMT`, `15_IDI2`, `16_MZB1`, `17_ORM2`, `18_PHYH`, `19_PMVK`, `20_RFK`, `21_PPOX`, `22_FHAB`
+Target configuration is loaded from `assets/antibody_nanobody/config/target_config.csv`.
+
+- **Part 1 (01-11, 21, 22)**: Benchmark validation group with binding hotspots (fixed scaffold requirement)
+  - Part 1 targets have non-empty `target_hotspots` in the config CSV
+  - Examples: `01_7UXQ`, `02_1TNF`, `03_3MJG`, `04_3DI3`, `05_4ZXB`, `06_5VLI`, `07_7LVW`, `08_7LUC`, `09_4G8A`, `10_6X93`, `11_4ZAM`, `21_6COB`, `22_7WPC`
+- **Part 2 (12-20)**: Challenge group without binding hotspots (allows scaffold diversity)
+  - Part 2 targets have empty `target_hotspots` in the config CSV
+  - Examples: `12_1BI7`, `13_1G1D`, `14_1LCE`, `15_1I9A`, `16_2O25`, `17_3BX7`, `18_2A1X`, `19_1WAK`, `20_1P4M`
 
 **Quota Limits:**
 - **Maximum 100 designs per target** (indices 0-99)
@@ -150,18 +154,24 @@ id,heavy_fv,light_fv,h_cdr1_start,h_cdr1_end,h_cdr2_start,h_cdr2_end,h_cdr3_star
 - Matching is done by extracting target name from PDB filename (e.g., `01_PDL1_0.pdb` → `01_PDL1`)
 
 **Scaffold Whitelist & Compliance:**
-- **Antibody Whitelist**: 1FVC, 6CR1, 5Y9K, 6WGB, 5YOY, 4M6M, 5UDC, 8IOW, 6WIO, 5J13, 5L6Y, 3HMW, 3H42, 6B3S, 5VZY
-- **Nanobody Whitelist**: 3EAK, 7EOW, 7XL0, 8COH, 8Z8V
-- **Part 1 Compliance**: Each target must use a single standard scaffold (Antibody: 1FVC, Nanobody: 3EAK)
-- **Part 2 Compliance**: Scaffolds must be in whitelist, diversity ≥ 3 recommended
+- **Antibody Whitelist** (15 scaffolds): 1FVC (hu-4D5-8_Fv.pdb), 6CR1, 5Y9K, 6WGB, 5YOY, 4M6M, 5UDC, 8IOW, 6WIO, 5J13, 5L6Y, 3HMW, 3H42, 6B3S, 5VZY
+  - Scaffold files located in: `assets/antibody_nanobody/scaffolds/antibody/`
+- **Nanobody Whitelist** (5 scaffolds): 3EAK, 7EOW, 7XL0, 8COH, 8Z8V
+  - Scaffold files located in: `assets/antibody_nanobody/scaffolds/nanobody/`
+  - Part 1 fixed scaffold: `h-NbBCII10.pdb` (mapped to scaffold ID in whitelist)
+- **Part 1 Compliance**: Each target must use a single fixed scaffold
+  - **Antibody**: `hu-4D5-8_Fv.pdb` (scaffold ID: 1FVC)
+  - **Nanobody**: `h-NbBCII10.pdb` (scaffold ID determined from file)
+- **Part 2 Compliance**: Scaffolds must be selected from whitelist, diversity ≥ 3 recommended
 - Pipeline performs pre-run compliance audit and generates a report
 
 **Pre-Run Compliance Report:**
 The pipeline automatically generates a compliance report before execution:
 ```
 Sequence | Target | Scaffold | Count | Status
-01        | 01_PDL1 | 1FVC    | 100   | Pass
-12        | 12_AMBP | 3EAK,7EOW,8COH | 100 | Pass
+01        | 01_7UXQ | 1FVC    | 100   | Pass
+12        | 12_1BI7 | 3EAK,7EOW,8COH | 100 | Pass
+21        | 21_6COB | 1FVC    | 100   | Pass
 ```
 - **Status**: Pass (compliant) or Warning (non-compliant)
 - Warnings are listed separately with detailed explanations
@@ -443,6 +453,7 @@ python scripts/run_antibody_pipeline.py \
     inversefold=LigandMPNN \
     refold=af3 \
     cdr_info_csv=/path/to/cdr_info.csv \
+    target_config_path=assets/antibody_nanobody/config/target_config.csv \
     max_designs_per_target=100 \
     proceed_with_warnings=false \
     gpus=0,1
@@ -454,25 +465,37 @@ python scripts/run_antibody_pipeline.py \
     inversefold=LigandMPNN \
     refold=af3 \
     cdr_info_csv=/path/to/cdr_info.csv \
+    target_config_path=assets/antibody_nanobody/config/target_config.csv \
     max_designs_per_target=100 \
     proceed_with_warnings=false \
     gpus=0,1
 ```
 
 **Input File Naming Examples:**
-- Valid: `01_PDL1_0.pdb`, `01_PDL1_1.pdb`, ..., `01_PDL1_99.pdb`
-- Valid: `12_AMBP_0.pdb`, `12_AMBP_1.pdb`, ..., `12_AMBP_99.pdb`
-- Invalid: `PDL1_0.pdb` (missing sequence number)
-- Invalid: `01_pdl1_0.pdb` (target ID must be uppercase)
-- Invalid: `01_PDL1_100.pdb` (exceeds quota of 100)
+- Valid: `01_7UXQ_0.pdb`, `01_7UXQ_1.pdb`, ..., `01_7UXQ_99.pdb`
+- Valid: `12_1BI7_0.pdb`, `12_1BI7_1.pdb`, ..., `12_1BI7_99.pdb`
+- Invalid: `7UXQ_0.pdb` (missing sequence number)
+- Invalid: `01_7uxq_0.pdb` (target ID must be uppercase)
+- Invalid: `01_7UXQ_100.pdb` (exceeds quota of 100)
 
 **CDR CSV Example:**
 ```csv
 id,heavy_fv,light_fv,h_cdr1_start,h_cdr1_end,h_cdr2_start,h_cdr2_end,h_cdr3_start,h_cdr3_end,l_cdr1_start,l_cdr1_end,l_cdr2_start,l_cdr2_end,l_cdr3_start,l_cdr3_end
-01_PDL1,H,L,30,35,50,65,95,102,24,34,50,56,89,97
-02_TNFA,H,L,30,35,50,65,95,102,24,34,50,56,89,97
-12_AMBP,H,,30,35,50,65,95,102,,,,,,
+01_7UXQ,H,L,30,35,50,65,95,102,24,34,50,56,89,97
+02_1TNF,H,L,30,35,50,65,95,102,24,34,50,56,89,97
+12_1BI7,H,,30,35,50,65,95,102,,,,,,
+21_6COB,H,L,30,35,50,65,95,102,24,34,50,56,89,97
+22_7WPC,H,L,30,35,50,65,95,102,24,34,50,56,89,97
 ```
+
+**Target Configuration:**
+The pipeline automatically loads target configuration from `assets/antibody_nanobody/config/target_config.csv`. This file defines:
+- Target IDs and their corresponding PDB IDs
+- Antigen chain information
+- Binding hotspots (for Part 1 targets)
+- Epitope descriptions
+
+You can override the default path by setting `target_config_path` in the config.
 
 ### Example 3: Motif Scaffolding
 ```bash
@@ -491,6 +514,249 @@ python scripts/run_interface_pipeline.py \
     gpus=0
 ``` 
 
+# BenchCore Usage Example
+
+## 1. Protein Evaluation 
+
+### Usage
+
+```python
+from evaluation.evaluation_api import Evaluation
+from omegaconf import DictConfig
+
+config = DictConfig({...})
+evaluator = Evaluation(config)
+
+# run_protein evaluation
+evaluator.run_protein_evaluation(
+    pipeline_dir="/path/to/pipeline",
+    output_csv="/path/to/results.csv",
+    ca_rmsd_threshold=2.0
+)
+```
+
+### Pipeline script
+
+```bash
+python scripts/run_protein_pipeline.py \
+    design_dir=/path/to/designs \
+    inversefold=ProteinMPNN \
+    refold=esmfold
+```
+
+## 2. Protein Binding Protein (PBP) Evaluation
+
+### Usage
+
+```python
+evaluator.run_protein_binding_protein_evaluation(
+    pipeline_dir="/path/to/pipeline",
+    output_csv="/path/to/results.csv"
+)
+```
+
+### Pipeline Script
+
+```bash
+python scripts/run_pbp_pipeline.py \
+    design_dir=/path/to/designs \
+    inversefold=ProteinMPNN \
+    refold=esmfold
+```
+
+## 3. Protein Binding Ligand (PBL) Evaluation
+
+### Usage
+
+```python
+evaluator.run_protein_binding_ligand_evaluation(
+    input_dir="/path/to/input",
+    output_dir="/path/to/output",
+    dist_cutoff=10.0,
+    exhaustiveness=16
+)
+```
+
+### Pipeline Script
+
+```bash
+python scripts/run_pbl_pipeline.py \
+    design_dir=/path/to/designs \
+    inversefold=LigandMPNN \
+    refold=esmfold
+```
+
+## 4. Nucleotide (NUC) Evaluation
+
+### Usage
+
+```python
+evaluator.run_nuc_evaluation(
+    pipeline_dir="/path/to/pipeline",
+    output_csv="/path/to/results.csv"
+)
+```
+
+### Pipeline Script
+
+```bash
+python scripts/run_nuc_pipeline.py \
+    design_dir=/path/to/designs \
+    inversefold=ODesign \
+    refold=af3
+```
+
+## 5. Motif Scaffolding Evaluation
+
+### Architecture Overview
+
+Motif Scaffolding uses Generator + Evaluator architecture:
+- **Generator Layer** (`generators/`): Handles model-specific data conversion
+  - `PPIFlowGenerator`: Fixes all-ALA sequences, structure alignment
+  - `RFD3Generator`: Parses JSON files, extracts contig information
+- **Evaluator Layer** (`evaluation/motif_evaluator.py`): Model-agnostic evaluation logic
+
+### Usage Method 1: Via evaluation_api
+
+```python
+from evaluation.evaluation_api import Evaluation
+from omegaconf import DictConfig
+
+config = DictConfig({
+    'motif_scaffolding': {
+        'model_name': 'PPIFlow',  # or 'RFD3'
+        'motifbench_dir': '/path/to/MotifBench',
+        'foldseek_database': '/path/to/foldseek/db'
+    },
+    'gpus': '0'
+})
+
+evaluator = Evaluation(config)
+
+# Run motif scaffolding evaluation
+results = evaluator.run_motif_scaffolding_evaluation(
+    design_dir="/path/to/design/outputs",
+    pipeline_dir="/path/to/pipeline/results",
+    model_name="PPIFlow",  # Optional, uses value from config if not provided
+    motif_list=["01_1LDB", "02_1ITU"]  # Optional, None means evaluate all
+)
+
+# results is a dictionary: {motif_name: result_dir}
+```
+
+### Usage Method 2: Direct use of MotifScaffoldingEvaluation
+
+```python
+from evaluation.motif_scaffolding_evaluation import MotifScaffoldingEvaluation
+from omegaconf import DictConfig
+
+config = DictConfig({...})
+
+# Initialize (automatically selects Generator)
+motif_evaluation = MotifScaffoldingEvaluation(config, model_name='PPIFlow')
+
+# Run evaluation
+results = motif_evaluation.run_motif_scaffolding_evaluation(
+    design_dir="/path/to/design/outputs",
+    pipeline_dir="/path/to/pipeline/results",
+    motif_list=["01_1LDB", "02_1ITU"]
+)
+```
+
+### Pipeline Script
+
+```bash
+python scripts/run_motif_scaffolding_pipeline.py \
+    design_dir=/path/to/design/outputs \
+    model_name=PPIFlow \
+    motif_scaffolding.motif_list=[01_1LDB,02_1ITU] \
+    inversefold=ProteinMPNN \
+    refold=esmfold \
+    gpus=0
+```
+
+### Evaluation Workflow
+
+1. **Generator.run()**: Standardizes model outputs
+   - PPIFlow: Fixes all-ALA sequences → Real residue names
+   - RFD3: Parses JSON → Generates scaffold_info.csv
+   - Output: Standardized PDB files and scaffold_info.csv
+
+2. **MotifEvaluator.run_evaluation()**: Model-agnostic evaluation
+   - InverseFold (ProteinMPNN): Sequence design
+   - ReFold (ESMFold): Structure prediction
+   - Metrics: RMSD, Novelty, Diversity (alpha=5 clustering)
+
+### Output Results
+
+Evaluation results for each motif are saved in:
+```
+{pipeline_dir}/motif_scaffolding/{motif_name}/evaluation_results/
+├── esm_complete_results.csv      # Complete evaluation results
+├── esm_novelty_results.csv       # Novelty results
+├── summary.txt                   # Summary (JSON format)
+└── successful_backbones/         # Successful backbone structures
+```
+
+## 6. Other Evaluation Tasks
+
+### Ligand Binding Protein (LBP)
+
+```python
+evaluator.run_ligand_binding_protein_evaluation(
+    pipeline_dir="/path/to/pipeline",
+    cands="/path/to/candidates",
+    output_csv="/path/to/results.csv"
+)
+```
+
+### Nucleotide Binding Ligand (NBL)
+
+```python
+evaluator.run_nuc_binding_ligand_evaluation(
+    pipeline_dir="/path/to/pipeline",
+    output_csv="/path/to/results.csv"
+)
+```
+
+### Protein Binding Nucleotide (PBN)
+
+```python
+evaluator.run_protein_binding_nuc_evaluation(
+    pipeline_dir="/path/to/pipeline",
+    output_csv="/path/to/results.csv"
+)
+```
+
+### Therapeutic Antibody/Nanobody Profile
+
+```
+# basic usage
+python benchcore/scripts/run_developability_evaluation.py \
+    --csv_file antibodies_fv.csv \
+    --results_dir ./af3_results \
+    --output developability_metrics.csv
+
+# test single antibody
+python benchcore/scripts/run_developability_evaluation.py \
+    --csv_file antibodies_fv.csv \
+    --results_dir ./af3_results \
+    --antibody-id AB001 \
+    --output test_metrics.csv
+```
+
+## General Pattern
+
+All evaluation tasks follow the same pattern:
+
+1. **Initialize**: `evaluator = Evaluation(config)`
+2. **Run Evaluation**: `evaluator.run_<task>_evaluation(...)`
+3. **Get Results**: Results are saved in the specified output directory or CSV file
+
+Special considerations for Motif Scaffolding:
+- Requires specifying `model_name` (PPIFlow or RFD3)
+- Uses Generator layer to handle model-specific data conversion
+- Evaluation logic is model-agnostic
 
 # nuc inverse folding
 ```bash

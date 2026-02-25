@@ -14,8 +14,11 @@ from Bio.PDB import PDBParser, MMCIFParser
 import warnings
 warnings.filterwarnings('ignore')
 
+from .target_config import load_target_config, get_part1_targets, get_part2_targets, is_part1_target
+
 
 # Scaffold Whitelist for Nanobodies (VHH)
+# Maps scaffold PDB ID to display name
 NANOBODY_SCAFFOLD_WHITELIST = {
     '3EAK': 'VHH scaffold',
     '7EOW': 'VHH scaffold',
@@ -24,26 +27,18 @@ NANOBODY_SCAFFOLD_WHITELIST = {
     '8Z8V': 'VHH scaffold'
 }
 
-# Part 1 Benchmark Targets (01-11) - Fixed scaffold requirement
-PART1_TARGETS = {
-    '01_PDL1': '3EAK',  # Standard scaffold for Part 1 (VHH)
-    '02_TNFA': '3EAK',
-    '03_PDGF': '3EAK',
-    '04_IL7R': '3EAK',
-    '05_INSR': '3EAK',
-    '06_H1HA': '3EAK',
-    '07_RSV1': '3EAK',
-    '08_RSV3': '3EAK',
-    '09_RBDS': '3EAK',
-    '10_IL10': '3EAK',
-    '11_BLAC': '3EAK'
-}
+# Part 1 fixed scaffold (h-NbBCII10.pdb - need to determine scaffold ID)
+# For now, we'll use 3EAK as default, but this should be determined from the file
+PART1_FIXED_SCAFFOLD = '3EAK'  # TODO: Map h-NbBCII10.pdb to correct scaffold ID
 
-# Part 2 Challenge Targets (12-22) - Allow scaffold diversity
-PART2_TARGETS = [
-    '12_AMBP', '13_GM2A', '14_HNMT', '15_IDI2', '16_MZB1',
-    '17_ORM2', '18_PHYH', '19_PMVK', '20_RFK', '21_PPOX', '22_FHAB'
-]
+# Scaffold file mapping (filename to scaffold ID)
+NANOBODY_SCAFFOLD_FILES = {
+    'h-NbBCII10.pdb': '3EAK',  # Default mapping, may need adjustment
+    '7eow.cif': '7EOW',
+    '7xl0.cif': '7XL0',
+    '8coh.cif': '8COH',
+    '8z8v.cif': '8Z8V'
+}
 
 
 class NanobodyDesignModule:
@@ -53,15 +48,27 @@ class NanobodyDesignModule:
     Handles nanobodies with only heavy chain (no light chain).
     """
     
-    def __init__(self, config):
+    def __init__(self, config, target_config_path: Optional[str] = None):
         self.config = config
         self.scaffold_whitelist = NANOBODY_SCAFFOLD_WHITELIST
-        self.part1_targets = PART1_TARGETS
-        self.part2_targets = PART2_TARGETS
+        self.part1_fixed_scaffold = PART1_FIXED_SCAFFOLD
+        
+        # Load target configuration
+        try:
+            self.target_df = load_target_config(target_config_path)
+            self.part1_targets = get_part1_targets(self.target_df)
+            self.part2_targets = get_part2_targets(self.target_df)
+        except Exception as e:
+            print(f"Warning: Failed to load target config: {e}")
+            print("Using default target lists")
+            # Fallback to default if config not available
+            self.target_df = None
+            self.part1_targets = []
+            self.part2_targets = []
     
     def validate_target_name(self, target_name: str) -> Tuple[bool, Optional[str]]:
         """
-        Validate target name format: {序号}_{四位大写ID}
+        Validate target name format: {sequence_number}_{target_id}
         
         Args:
             target_name: Target name to validate
@@ -73,7 +80,7 @@ class NanobodyDesignModule:
         match = re.match(pattern, target_name)
         
         if not match:
-            return False, f"Invalid target name format: {target_name}. Expected format: {{序号}}_{{四位大写ID}}"
+            return False, f"Invalid target name format: {target_name}. Expected format: {{sequence_number}}_{{target_id}}"
         
         seq_num = int(match.group(1))
         target_id = match.group(2)
@@ -82,15 +89,11 @@ class NanobodyDesignModule:
         if seq_num < 1 or seq_num > 22:
             return False, f"Sequence number {seq_num} out of range (01-22)"
         
-        # Check if target is in known list
-        if seq_num <= 11:
-            expected_id = list(self.part1_targets.keys())[seq_num - 1].split('_')[1]
-            if target_id != expected_id:
-                return False, f"Part 1 target {seq_num:02d} should be {expected_id}, got {target_id}"
-        elif seq_num <= 22:
-            expected_id = PART2_TARGETS[seq_num - 12].split('_')[1]
-            if target_id != expected_id:
-                return False, f"Part 2 target {seq_num:02d} should be {expected_id}, got {target_id}"
+        # If target config is loaded, validate against it
+        if self.target_df is not None:
+            valid_targets = self.target_df['target_id'].tolist()
+            if target_name not in valid_targets:
+                return False, f"Target {target_name} not found in target configuration"
         
         return True, None
     
@@ -140,14 +143,11 @@ class NanobodyDesignModule:
         if scaffold:
             return scaffold.upper()
         
-        # Try to read from PDB header
-        try:
-            parser = PDBParser(QUIET=True)
-            structure = parser.get_structure('nanobody', str(pdb_path))
-            # Check header for scaffold info (if available)
-            # For now, return None and rely on filename
-        except Exception:
-            pass
+        # Check if filename matches known scaffold files
+        filename_lower = filename.lower()
+        for scaffold_file, scaffold_id in NANOBODY_SCAFFOLD_FILES.items():
+            if filename_lower == scaffold_file.lower() or scaffold_file.lower() in filename_lower:
+                return scaffold_id
         
         return None
     
@@ -260,13 +260,13 @@ class NanobodyDesignModule:
         warnings = []
         
         for target_name in sorted(target_files.keys()):
-            seq_num = int(target_name.split('_')[0])
+            is_part1 = is_part1_target(self.target_df, target_name) if self.target_df is not None else False
             scaffolds = target_scaffolds[target_name]
             count = len(target_files[target_name])
             
-            # Part 1 audit: Check for single scaffold requirement
-            if seq_num <= 11:
-                expected_scaffold = self.part1_targets.get(target_name)
+            # Part 1 audit: Check for single fixed scaffold requirement
+            if is_part1:
+                expected_scaffold = self.part1_fixed_scaffold
                 if len(scaffolds) > 1:
                     warnings.append(
                         f"Part 1 target {target_name}: Multiple scaffolds detected {scaffolds}. "
