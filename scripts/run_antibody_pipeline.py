@@ -22,12 +22,21 @@ from evaluation.evaluation_api import Evaluation
 from evaluation.antibody import AntibodyDesignModule, NanobodyDesignModule
 
 
+def _gpus_to_list(cfg):
+    """Normalize gpus config to a list of GPU id strings (supports list or comma-separated string)."""
+    g = cfg.gpus
+    if isinstance(g, (list, tuple)):
+        return [str(x).strip() for x in g]
+    return [x.strip() for x in str(g).split(",") if x.strip()]
+
+
 @hydra.main(config_path="../configs", config_name="config")
 def main(cfg: DictConfig):
     """
     Main pipeline function with strict input auditing.
     """
-    os.environ["CUDA_VISIBLE_DEVICES"] = str(cfg.gpus)
+    gpu_list = _gpus_to_list(cfg)
+    os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(gpu_list)
 
     # Initialize directories
     hydra_cwd = os.getcwd()
@@ -43,13 +52,30 @@ def main(cfg: DictConfig):
     if target_config_path:
         target_config_path = os.path.join(get_original_cwd(), target_config_path) if not os.path.isabs(target_config_path) else target_config_path
     
+    # Get scaffolds directory path
+    scaffolds_dir = cfg.get('scaffolds_dir', None)
+    if scaffolds_dir:
+        scaffolds_dir = os.path.join(get_original_cwd(), scaffolds_dir) if not os.path.isabs(scaffolds_dir) else scaffolds_dir
+    else:
+        # Default scaffolds directory
+        default_scaffolds_dir = os.path.join(get_original_cwd(), "assets", "antibody_nanobody", "scaffolds")
+        scaffolds_dir = default_scaffolds_dir if os.path.exists(default_scaffolds_dir) else None
+    
     if antibody_type == 'nanobody':
-        design_module = NanobodyDesignModule(cfg, target_config_path=target_config_path)
+        design_module = NanobodyDesignModule(
+            cfg, 
+            target_config_path=target_config_path,
+            scaffolds_dir=scaffolds_dir
+        )
         print("=" * 80)
         print("NANOBODY (VHH) DESIGN MODULE")
         print("=" * 80)
     else:
-        design_module = AntibodyDesignModule(cfg, target_config_path=target_config_path)
+        design_module = AntibodyDesignModule(
+            cfg, 
+            target_config_path=target_config_path,
+            scaffolds_dir=scaffolds_dir
+        )
         print("=" * 80)
         print("ANTIBODY (scFv/Fab) DESIGN MODULE")
         print("=" * 80)
@@ -149,7 +175,7 @@ def main(cfg: DictConfig):
     inverse_fold_model.run_ligandmpnn_distributed(
         input_dir=Path(formatted_designs_dir), 
         output_dir=os.path.join(pipeline_dir, "inverse_fold"), 
-        gpu_list=str(cfg.gpus).split(','), 
+        gpu_list=_gpus_to_list(cfg), 
         origin_cwd=get_original_cwd(),
         cdr_info_csv=cdr_info_csv,
         use_cdr_fix=True,

@@ -202,32 +202,36 @@ class DevelopabilityScorer:
         index_map = {}  # Keys: ('heavy', 0), ('light', 0)... Values: (chain_id, res_id_tuple)
         
         def map_chain(chain_obj, ref_seq, chain_type):
-            if ref_seq is None or len(ref_seq) == 0:
-                return True
-                
             pdb_residues = list(chain_obj.get_residues())
-            pdb_seq = ""
             valid_pdb_res = []
             for r in pdb_residues:
                 if r.resname in AA_3TO1:
-                    pdb_seq += AA_3TO1[r.resname]
                     valid_pdb_res.append(r)
-            
+            if not valid_pdb_res:
+                return True
+            pdb_seq = "".join(AA_3TO1[r.resname] for r in valid_pdb_res)
+
+            # No sequence provided: build index_map from structure (1-based position = index+1)
+            if ref_seq is None or len(ref_seq) == 0:
+                for i, r in enumerate(valid_pdb_res):
+                    index_map[(chain_type, i)] = (chain_obj.id, r.get_id())
+                return True
+
             # Simple exact match check first
             if pdb_seq == ref_seq:
                 for i, r in enumerate(valid_pdb_res):
                     index_map[(chain_type, i)] = (chain_obj.id, r.get_id())
                 return True
-            
+
             # Fallback: map 0..min_len
             limit = min(len(pdb_seq), len(ref_seq))
             for i in range(limit):
                 index_map[(chain_type, i)] = (chain_obj.id, valid_pdb_res[i].get_id())
             return True
 
-        map_chain(chain_h, heavy_seq, 'heavy')
-        if chain_l and light_seq:
-            map_chain(chain_l, light_seq, 'light')
+        map_chain(chain_h, (heavy_seq or "").strip() or None, 'heavy')
+        if chain_l is not None:
+            map_chain(chain_l, (light_seq or "").strip() if light_seq is not None else None, 'light')
 
         # 3. Calculate SASA
         sasa_dict = {}  # {(chain_id, res_id): {'total': X, 'sidechain': Y, 'resname': Z}}
@@ -524,7 +528,7 @@ class DevelopabilityScorer:
         
         Args:
             cif_path: CIF file path
-            row: CSV row with CDR indices and sequences
+            row: CSV row with CDR indices (heavy_fv/light_fv optional; index_map built from structure if absent)
             
         Returns:
             Dict with metrics and categorization

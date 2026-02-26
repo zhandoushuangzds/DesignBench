@@ -84,6 +84,13 @@ def get_nucleic_acid_sequence(chain_struct):
         
         return sequence if sequence else None
 
+def _gpus_to_str(gpus) -> str:
+    """Normalize gpus config to comma-separated string (supports list or string)."""
+    if isinstance(gpus, (list, tuple)):
+        return ",".join(str(x).strip() for x in gpus)
+    return str(gpus).strip()
+
+
 class ReFold:
 
     def __init__(self, config):
@@ -91,8 +98,8 @@ class ReFold:
         self.config = config
 
     def run_alphafold3(self, input_json: str, output_dir: str):
-
-        cmd = ["bash", f"{self.config.refold.af3_exec}", f"{self.config.refold.exp_name}", f"{input_json}", f"{output_dir}", f"{self.config.gpus}", f"{self.config.refold.run_data_pipeline}", f"{self.config.refold.cache_dir}"]
+        gpus_str = _gpus_to_str(self.config.gpus)
+        cmd = ["bash", f"{self.config.refold.af3_exec}", f"{self.config.refold.exp_name}", f"{input_json}", f"{output_dir}", gpus_str, f"{self.config.refold.run_data_pipeline}", f"{self.config.refold.cache_dir}"]
         subprocess.run(cmd, check=True)
     
     def run_chai1(self, fasta_list: list, output_dir: str):
@@ -139,7 +146,7 @@ class ReFold:
             # "-n", "batch_esmfold",
             "-s", sequences_file_json,
             "-o", output_dir,
-            "-g", str(len(self.config.gpus.split(","))),
+            "-g", str(len(_gpus_to_str(self.config.gpus).split(","))),
             "-p", str(self.config.refold.master_port),
             "-m", self.config.refold.esmfold_model_dir
         ]

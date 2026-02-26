@@ -1,0 +1,10 @@
+# BenchCore nanobody target 06_5VLI
+# Generated for BoltzGen; 100 designs per target.
+entities:
+  - file:
+      path: /home/qiantai/zihan/benchcore/assets/antibody_nanobody/antigens/06_5VLI.cif
+      include:
+            - chain:
+                id: B
+  - file:
+        path: /home/qiantai/zihan/benchcore/assets/antibody_nanobody/scaffolds/nanobody/h-NbBCII10.yaml

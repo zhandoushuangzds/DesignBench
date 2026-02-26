@@ -277,12 +277,9 @@ def main():
             continue
 
         h1_s, h1_e, h2_s, h2_e, h3_s, h3_e = cdrs
-        # BenchCore CSV: id, heavy_fv, light_fv, h_cdr1_start, h_cdr1_end, ...
-        # For TNP, end is exclusive. heavy_fv: use full sequence so DevelopabilityScorer builds full index_map.
+        # BenchCore CSV: id, h_cdr1_start, h_cdr1_end, ... (no sequences)
         rows.append({
             "id": sample_id,
-            "heavy_fv": seq,
-            "light_fv": "",
             "h_cdr1_start": h1_s,
             "h_cdr1_end": h1_e,
             "h_cdr2_start": h2_s,
@@ -300,7 +297,7 @@ def main():
     out_path = args.out.resolve()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = [
-        "id", "heavy_fv", "light_fv",
+        "id",
         "h_cdr1_start", "h_cdr1_end", "h_cdr2_start", "h_cdr2_end", "h_cdr3_start", "h_cdr3_end",
         "l_cdr1_start", "l_cdr1_end", "l_cdr2_start", "l_cdr2_end", "l_cdr3_start", "l_cdr3_end",
     ]

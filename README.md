@@ -99,10 +99,38 @@ Target configuration is loaded from `assets/antibody_nanobody/config/target_conf
 
 - **Part 1 (01-11, 21, 22)**: Benchmark validation group with binding hotspots (fixed scaffold requirement)
   - Part 1 targets have non-empty `target_hotspots` in the config CSV
+  - **Scaffold**: Each Part 1 target must use **exactly one fixed scaffold** (see below).
   - Examples: `01_7UXQ`, `02_1TNF`, `03_3MJG`, `04_3DI3`, `05_4ZXB`, `06_5VLI`, `07_7LVW`, `08_7LUC`, `09_4G8A`, `10_6X93`, `11_4ZAM`, `21_6COB`, `22_7WPC`
 - **Part 2 (12-20)**: Challenge group without binding hotspots (allows scaffold diversity)
   - Part 2 targets have empty `target_hotspots` in the config CSV
+  - **Scaffold**: Part 2 targets may use **any scaffold from the whitelist** (antibody: 15 scaffolds, nanobody: 5 scaffolds); diversity ≥ 3 per target is recommended.
   - Examples: `12_1BI7`, `13_1G1D`, `14_1LCE`, `15_1I9A`, `16_2O25`, `17_3BX7`, `18_2A1X`, `19_1WAK`, `20_1P4M`
+
+**Target configuration (`target_config.csv`)**
+
+| Column | Description |
+|--------|-------------|
+| `target_id` | Target name, e.g. `01_7UXQ`, `12_1BI7`. Must match design filenames. |
+| `antigen_chains` | **Antigen region the model should focus on** (chain + residue range in **auth** numbering). Format: `ChainStart-End` or `Chain1Start-End,Chain2Start-End`. Examples: `A17-132` = chain A, residues 17–132; `A12-109` = chain A, residues 12–109. For **Part 2** targets (12–20), this column may contain only a chain letter (e.g. `A` or `B`): **no specific region is specified**; the entire chain(s) are valid for design (free design). |
+| `target_hotspots` | Comma-separated hotspot residues (e.g. `A56,A115,A123`) for Part 1; empty for Part 2. |
+| `epitope_description` | Human-readable epitope description. |
+
+**Antigen cropping (optional, shared by all models)**  
+Cropped antigens live under `assets/antibody_nanobody/antigens_cropped/` and are produced by a **single assets-side script** (not inside any model runner). All benchmark runs (e.g. RFantibody, BoltzGen) should use these when present.
+
+- **Step 1 — by `antigen_chains`**: Keep only the specified chain(s) and residue range(s) in **auth** numbering. Examples: `A17-132` → keep chain A residues 17–132; `A` or `B` → keep that entire chain (used for Part 2 targets 12–20).
+- **Step 2 — by distance to hotspots**: For targets that are **not** 12–20 and have `target_hotspots`, further keep only residues within **20 Å** of any hotspot atom.
+- **Exception**: Targets **12–20** (9 Part 2 targets): only Step 1 is applied; no distance-based crop.
+
+Generate cropped PDBs (requires `biopython`):
+
+```bash
+# From benchcore repo root
+python assets/antibody_nanobody/scripts/crop_antigens_for_benchmark.py
+# Optional: --distance 20 (default), --dry_run
+```
+
+Output: `assets/antibody_nanobody/antigens_cropped/{target_id}.pdb`. Model runners (e.g. RFantibody) will use these files when present instead of converting from CIF.
 
 **Quota Limits:**
 - **Maximum 100 designs per target** (indices 0-99)
@@ -153,16 +181,62 @@ id,heavy_fv,light_fv,h_cdr1_start,h_cdr1_end,h_cdr2_start,h_cdr2_end,h_cdr3_star
 - This ensures only CDR regions are redesigned, keeping the scaffold constant
 - Matching is done by extracting target name from PDB filename (e.g., `01_PDL1_0.pdb` → `01_PDL1`)
 
-**Scaffold Whitelist & Compliance:**
-- **Antibody Whitelist** (15 scaffolds): 1FVC (hu-4D5-8_Fv.pdb), 6CR1, 5Y9K, 6WGB, 5YOY, 4M6M, 5UDC, 8IOW, 6WIO, 5J13, 5L6Y, 3HMW, 3H42, 6B3S, 5VZY
-  - Scaffold files located in: `assets/antibody_nanobody/scaffolds/antibody/`
-- **Nanobody Whitelist** (5 scaffolds): 3EAK, 7EOW, 7XL0, 8COH, 8Z8V
-  - Scaffold files located in: `assets/antibody_nanobody/scaffolds/nanobody/`
-  - Part 1 fixed scaffold: `h-NbBCII10.pdb` (mapped to scaffold ID in whitelist)
-- **Part 1 Compliance**: Each target must use a single fixed scaffold
-  - **Antibody**: `hu-4D5-8_Fv.pdb` (scaffold ID: 1FVC)
-  - **Nanobody**: `h-NbBCII10.pdb` (scaffold ID determined from file)
-- **Part 2 Compliance**: Scaffolds must be selected from whitelist, diversity ≥ 3 recommended
+**Scaffold Whitelist & Compliance**
+
+- **Part 1 — fixed scaffold (one per task)**  
+  Each Part 1 target must use **exactly one** fixed scaffold. No mixing of scaffolds within a Part 1 target.
+  - **Antibody**: `hu-4D5-8_Fv.pdb` (scaffold ID: **1FVC**)
+    - Config: `assets/antibody_nanobody/scaffolds/antibody/hu-4D5-8_Fv.yaml`
+    - Heavy chain CDRs (1-based): CDR1 (26-33), CDR2 (51-58), CDR3 (97-105)
+    - Light chain CDRs (1-based): CDR1 (143-148), CDR2 (166-168), CDR3 (205-213)
+  - **Nanobody**: `h-NbBCII10.pdb` (scaffold ID: **3EAK**)
+    - Config: `assets/antibody_nanobody/scaffolds/nanobody/h-NbBCII10.yaml`
+    - Heavy chain CDRs (1-based): CDR1 (26-36), CDR2 (54-61), CDR3 (100-117)
+- **Part 2 — whitelist, diversity encouraged**  
+  Part 2 targets may use **any** scaffold from the whitelist; using **at least 3 different scaffolds** per target is recommended.
+  - **Antibody whitelist** (15 scaffolds): 1FVC (hu-4D5-8_Fv.pdb), 6CR1, 5Y9K, 6WGB, 5YOY, 4M6M, 5UDC, 8IOW, 6WIO, 5J13, 5L6Y, 3HMW, 3H42, 6B3S, 5VZY  
+    - Files: `assets/antibody_nanobody/scaffolds/antibody/` (PDB/CIF + YAML per scaffold)
+  - **Nanobody whitelist** (5 scaffolds): 3EAK, 7EOW, 7XL0, 8COH, 8Z8V  
+    - Files: `assets/antibody_nanobody/scaffolds/nanobody/` (PDB/CIF + YAML per scaffold)
+- The pipeline loads scaffold and CDR information from these YAML files. You can override the scaffolds directory with the `scaffolds_dir` parameter in `run_antibody_pipeline.py`.
+- **Scaffold Configuration Format**: YAML files in scaffolds directory
+  - **Extended Format** (recommended for Part 1 scaffolds): Includes explicit CDR information
+    ```yaml
+    path: hu-4D5-8_Fv.pdb
+    chains:
+      - id: H
+        type: heavy
+        cdr_regions:
+          cdr1:
+            start: 26
+            end: 33
+          cdr2:
+            start: 51
+            end: 58
+          cdr3:
+            start: 97
+            end: 105
+      - id: L
+        type: light
+        cdr_regions:
+          cdr1:
+            start: 143
+            end: 148
+          cdr2:
+            start: 166
+            end: 168
+          cdr3:
+            start: 205
+            end: 213
+    scaffold_id: 1FVC
+    scaffold_name: hu4D5-8
+    ```
+  - **Boltzgen Format**: Compatible with existing boltzgen YAML files (used for Part 2 scaffolds)
+    - Uses `design` sections with `res_index` ranges
+    - Can be converted to extended format if needed
+  - CDR regions are specified in PDB residue numbering (1-based, inclusive)
+  - Configuration files: `hu-4D5-8_Fv.yaml`, `h-NbBCII10.yaml`, etc.
+- Pipeline automatically loads scaffold configurations and extracts CDR information
 - Pipeline performs pre-run compliance audit and generates a report
 
 **Pre-Run Compliance Report:**
@@ -457,6 +531,7 @@ python scripts/run_antibody_pipeline.py \
     max_designs_per_target=100 \
     proceed_with_warnings=false \
     gpus=0,1
+# Optional: scaffolds_dir=assets/antibody_nanobody/scaffolds  (default; override if needed)
 
 # VHH (nanobody)
 python scripts/run_antibody_pipeline.py \
@@ -490,12 +565,12 @@ id,heavy_fv,light_fv,h_cdr1_start,h_cdr1_end,h_cdr2_start,h_cdr2_end,h_cdr3_star
 
 **Target Configuration:**
 The pipeline automatically loads target configuration from `assets/antibody_nanobody/config/target_config.csv`. This file defines:
-- Target IDs and their corresponding PDB IDs
-- Antigen chain information
-- Binding hotspots (for Part 1 targets)
-- Epitope descriptions
+- **target_id**: Target name (must match design filenames).
+- **antigen_chains**: Antigen region to focus on (auth numbering). Format `ChainStart-End` (e.g. `A12-109` = chain A, residues 12–109). Part 2 targets (12–20) may list only a chain (e.g. `A` or `B`) with no residue range (free design).
+- **target_hotspots**: Binding hotspots for Part 1; empty for Part 2.
+- **epitope_description**: Human-readable description.
 
-You can override the default path by setting `target_config_path` in the config.
+You can override the config path with `target_config_path` and the scaffolds directory (for Part 1/Part 2 YAML and PDB/CIF) with `scaffolds_dir` (default: `assets/antibody_nanobody/scaffolds`).
 
 ### Example 3: Motif Scaffolding
 ```bash

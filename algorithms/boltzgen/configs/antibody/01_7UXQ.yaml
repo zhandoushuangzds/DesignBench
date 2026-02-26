@@ -1,0 +1,10 @@
+# BenchCore antibody (Fab) target 01_7UXQ
+# Generated for BoltzGen; 100 designs per target.
+entities:
+  - file:
+      path: /home/qiantai/zihan/benchcore/assets/antibody_nanobody/antigens/01_7UXQ.cif
+      include:
+            - chain:
+                id: A
+  - file:
+        path: /home/qiantai/zihan/benchcore/assets/antibody_nanobody/scaffolds/antibody/hu-4D5-8_Fv.yaml

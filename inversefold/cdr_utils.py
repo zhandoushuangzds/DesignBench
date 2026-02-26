@@ -216,61 +216,50 @@ def load_cdr_info_csv(cdr_info_csv: str) -> pd.DataFrame:
 def match_pdb_to_cdr_info(pdb_path: Path, cdr_df: pd.DataFrame) -> Optional[pd.Series]:
     """
     Match a PDB file to its CDR information row.
-    
-    Matching strategy:
-    1. Extract target name from PDB path (e.g., "01_PDL1_0.pdb" -> "01_PDL1")
-    2. Try to match with 'id' column in CDR CSV
+
+    Matching strategy (supports both per-design and per-target CDR CSV):
+    1. Try exact match on full design id (e.g. "01_7UXQ_0" for 01_7UXQ_0.cif)
+    2. Fallback to target name (e.g. "01_7UXQ") for per-target CSV
     3. Support "target:scaffold" format in CSV
-    
+
     Args:
         pdb_path: Path to PDB file
         cdr_df: DataFrame with CDR information
-        
+
     Returns:
         Series with CDR information for this PDB, or None if not found
     """
     import re
-    
-    # Extract target name from PDB path
-    # Format: "01_PDL1_0.pdb" or "01_PDL1_scaffold_0.pdb"
-    pdb_stem = pdb_path.stem  # Without extension
-    
-    # Pattern: {sequence_number}_{target_id}_{optional_scaffold}_{index}
-    # We want to extract: {sequence_number}_{target_id}
-    pattern = r'^(\d{2}_[A-Z0-9]{4,})'
-    match = re.match(pattern, pdb_stem)
-    
+
+    pdb_stem = pdb_path.stem  # e.g. 01_7UXQ_0
+
+    # Pattern: {sequence_number}_{target_id}_{index} or {sequence_number}_{target_id}
+    target_pattern = r'^(\d{2}_[A-Z0-9]{4,})'
+    match = re.match(target_pattern, pdb_stem)
     if match:
         target_name = match.group(1)
     else:
-        # Fallback: try to extract base name
         base_name = re.sub(r'[-_]?\d+$', '', pdb_stem)
         target_name = base_name
-    
-    # Try exact match first
+
+    # 1. Try exact match on full design id (per-design: id = 01_7UXQ_0)
+    matches = cdr_df[cdr_df['id'] == pdb_stem]
+    if len(matches) > 0:
+        return matches.iloc[0]
+
+    # 2. Fallback: per-target (id = 01_7UXQ)
     matches = cdr_df[cdr_df['id'] == target_name]
     if len(matches) > 0:
         return matches.iloc[0]
     
-    # Try with "target:scaffold" format
-    # If CSV has "target:scaffold" format, try matching
+    # 3. Legacy "target:scaffold" format (do not use startswith(target_name) - would wrongly match 01_7UXQ_0 for 01_7UXQ_99)
     for idx, row in cdr_df.iterrows():
         csv_id = str(row['id'])
-        # Check if CSV ID starts with target name
-        if csv_id.startswith(target_name):
-            return row
-        # Check if CSV ID matches (with or without colon)
         if csv_id.replace(':', '-') == target_name or csv_id.replace(':', '_') == target_name:
             return row
-        
-        # Also try reverse: if target_name has colon, try matching
         if ':' in csv_id:
             csv_base = csv_id.split(':')[0] + '_' + csv_id.split(':')[1].split('_')[0] if '_' in csv_id.split(':')[1] else csv_id.split(':')[0]
             if csv_base == target_name:
                 return row
-    
-    # If still no match, try partial match
-    if target_name in cdr_df['id'].values:
-        return cdr_df[cdr_df['id'] == target_name].iloc[0]
-    
+
     return None

@@ -1,0 +1,10 @@
+# BenchCore nanobody target 07_7LVW
+# Generated for BoltzGen; 100 designs per target.
+entities:
+  - file:
+      path: /home/qiantai/zihan/benchcore/assets/antibody_nanobody/antigens/07_7LVW.cif
+      include:
+            - chain:
+                id: D
+  - file:
+        path: /home/qiantai/zihan/benchcore/assets/antibody_nanobody/scaffolds/nanobody/h-NbBCII10.yaml

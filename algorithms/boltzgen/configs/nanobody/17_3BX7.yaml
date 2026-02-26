@@ -1,0 +1,14 @@
+# BenchCore nanobody target 17_3BX7
+# Generated for BoltzGen; 100 designs per target.
+entities:
+  - file:
+      path: /home/qiantai/zihan/benchcore/assets/antibody_nanobody/antigens/17_3APU.cif
+      include:
+            - chain:
+                id: A
+  - file:
+        path:
+            - /home/qiantai/zihan/benchcore/assets/antibody_nanobody/scaffolds/nanobody/7eow.yaml
+            - /home/qiantai/zihan/benchcore/assets/antibody_nanobody/scaffolds/nanobody/7xl0.yaml
+            - /home/qiantai/zihan/benchcore/assets/antibody_nanobody/scaffolds/nanobody/8coh.yaml
+            - /home/qiantai/zihan/benchcore/assets/antibody_nanobody/scaffolds/nanobody/8z8v.yaml

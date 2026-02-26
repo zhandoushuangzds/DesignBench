@@ -1,0 +1,10 @@
+# BenchCore nanobody target 05_4ZXB
+# Generated for BoltzGen; 100 designs per target.
+entities:
+  - file:
+      path: /home/qiantai/zihan/benchcore/assets/antibody_nanobody/antigens/05_4ZXB.cif
+      include:
+            - chain:
+                id: E
+  - file:
+        path: /home/qiantai/zihan/benchcore/assets/antibody_nanobody/scaffolds/nanobody/h-NbBCII10.yaml

@@ -12,9 +12,6 @@ from typing import Dict, Any, List, Optional, Tuple, Callable
 from biotite.structure.io import pdb, pdbx
 import biotite.structure as struc
 import biotite.structure.io as io
-from .InverseFold.utils.tools import parse_cif_to_samples, reload_model, inference, save_sequence_replaced_cif, _AA1_TO_AA3
-from .InverseFold.utils.inference_utils import extract_ligand_samples_from_cif
-from .gRNAde.gRNAde import gRNAde
 
 def _setup_distributed(local_rank, world_size):
     """Sets up the distributed environment for a worker process."""
@@ -44,6 +41,8 @@ def _odesign_mpnn_worker(
     """
     This is the function that each individual GPU process will run.
     """
+    from .InverseFold.utils.tools import reload_model, inference, _AA1_TO_AA3
+
     _setup_distributed(local_rank, world_size)
     device = f"cuda:{local_rank}"
     
@@ -367,6 +366,9 @@ class InverseFold:
         Starts ODesignMPNN inference on multiple GPUs.
         The 'device' parameter is ignored and is now controlled by 'local_rank'.
         """
+        from .InverseFold.utils.tools import parse_cif_to_samples
+        from .InverseFold.utils.inference_utils import extract_ligand_samples_from_cif
+
         os.makedirs(inverse_fold_root, exist_ok=True)
         samples_all: List[Dict[str, Any]] = []
 

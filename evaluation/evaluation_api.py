@@ -844,11 +844,9 @@ class Evaluation():
         
         Args:
             pipeline_dir: Root directory of the pipeline (contains refold/af3_out)
-            cdr_info_csv: Path to CSV file with CDR indices (must contain columns:
-                         id, heavy_fv, light_fv (optional), h_cdr1_start, h_cdr1_end,
-                         h_cdr2_start, h_cdr2_end, h_cdr3_start, h_cdr3_end,
-                         l_cdr1_start, l_cdr1_end, l_cdr2_start, l_cdr2_end,
-                         l_cdr3_start, l_cdr3_end)
+            cdr_info_csv: Path to CSV file with CDR indices (columns: id,
+                         h_cdr1_start, h_cdr1_end, ..., l_cdr3_start, l_cdr3_end).
+                         heavy_fv/light_fv are not required (sequence from structure is used).
             output_csv: Output CSV file path for developability metrics
             num_seeds: Number of seeds to process per antibody (default: 4)
         """

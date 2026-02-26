@@ -1,0 +1,14 @@
+# BenchCore nanobody target 02_1TNF
+# Generated for BoltzGen; 100 designs per target.
+entities:
+  - file:
+      path: /home/qiantai/zihan/benchcore/assets/antibody_nanobody/antigens/02_1TNF.cif
+      include:
+            - chain:
+                id: A
+            - chain:
+                id: B
+            - chain:
+                id: C
+  - file:
+        path: /home/qiantai/zihan/benchcore/assets/antibody_nanobody/scaffolds/nanobody/h-NbBCII10.yaml

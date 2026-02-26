@@ -7,6 +7,12 @@ design_dir: /home/wang_qinghan/wang_yilin/workspace/rfantibody/data/outputs
 root: results
 gpus: 2,3,4,5,6,7
 
+# Antibody/nanobody pipeline (override from CLI)
+antibody_type: antibody
+cdr_info_csv: null
+target_config_path: null
+max_designs_per_target: 100
+
 hydra:
   run:
     dir: output/rfantibody

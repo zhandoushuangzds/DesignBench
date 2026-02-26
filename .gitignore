@@ -1,5 +1,8 @@
 algorithms/odesign/InverseFold/ckpts/
 refold/esmfold/weights/
+output/
+assets/antigen_nanobody/antigens/
+assets/antigen_nanobody/scripts/
 
 venv/
 .env
