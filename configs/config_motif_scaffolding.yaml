@@ -1,4 +1,5 @@
 defaults:
+  - _self_
   - motif_scaffolding: motif_scaffolding
   - inversefold: ProteinMPNN
   - refold: esmfold

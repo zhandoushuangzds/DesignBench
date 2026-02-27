@@ -190,10 +190,11 @@ def main(cfg: DictConfig):
     print("STEP 4: REFOLDING (AlphaFold3)")
     print("=" * 80)
     
-    # Make AF3 input JSON
+    # Make AF3 input JSON (use_backbone_as_template=True: fix same regions as inverse fold)
     refold_model.make_af3_json_multi_process(
-        backbone_dir=os.path.join(pipeline_dir, "inverse_fold", "backbones"), 
-        output_path=os.path.join(pipeline_dir, "refold", "af3_input.json"), 
+        backbone_dir=os.path.join(pipeline_dir, "inverse_fold", "backbones"),
+        output_path=os.path.join(pipeline_dir, "refold", "af3_input.json"),
+        use_backbone_as_template=True,
     )
     
     # Run AF3

@@ -1,4 +1,5 @@
 name: esmfold
 num_workers: 8
-esmfold_model_dir: /home/nvme04/qtfeng/design/benchmark/dev/20251231/ODesign_benchmark/refold/esmfold/weights
+# Override via ESMFOLD_MODEL_DIR or refold.esmfold_model_dir=
+esmfold_model_dir: ${oc.env:ESMFOLD_MODEL_DIR,/home/nvme04/qtfeng/design/benchmark/dev/20251231/ODesign_benchmark/refold/esmfold/weights}
 master_port: 29500

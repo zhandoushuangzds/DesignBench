@@ -8,8 +8,11 @@ python_path: /DATA/disk0/qtfeng/miniforge3/envs/motif_bench/bin/python
 # Foldseek database path (required for novelty calculation)
 foldseek_database: /home/qiantai/zihan/foldseek/databases/pdb
 
-# GPU ID for evaluation (optional, will use available GPU if not specified)
+# GPU ID for evaluation (optional, use GPU if specified)
 gpu_id: null
 
 # List of motifs to evaluate (optional, evaluates all if not specified)
 motif_list: null
+
+# Limit samples per motif for quick test (e.g. 5); null = no limit
+max_samples_per_motif: null

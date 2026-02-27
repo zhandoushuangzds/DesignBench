@@ -57,6 +57,12 @@ def _parse_atom_site_columns(cif_path: Path):
     return idx
 
 
+def get_chain_ids_from_cif(cif_path: Path) -> list:
+    """Return ordered list of chain IDs in the CIF. First = H, second = L (if antibody)."""
+    chain_counts = get_chain_residue_counts_from_cif(cif_path)
+    return [c for c, _ in chain_counts]
+
+
 def get_chain_residue_counts_from_cif(cif_path: Path):
     idx_map = _parse_atom_site_columns(cif_path)
     idx_asym = idx_map.get("label_asym_id", idx_map.get("auth_asym_id", 6))
@@ -377,7 +383,7 @@ def main():
     design_dir.mkdir(parents=True, exist_ok=True)
 
     fieldnames = [
-        "id",
+        "id", "h_chain", "l_chain",
         "h_cdr1_start", "h_cdr1_end", "h_cdr2_start", "h_cdr2_end", "h_cdr3_start", "h_cdr3_end",
         "l_cdr1_start", "l_cdr1_end", "l_cdr2_start", "l_cdr2_end", "l_cdr3_start", "l_cdr3_end",
     ]
@@ -407,12 +413,15 @@ def main():
         # One CDR row per design (BenchCore: id = 01_7UXQ_0, 01_7UXQ_1, ...)
         for i, cif_path in enumerate(cif_files):
             design_id = f"{target_id}_{i}"
+            chain_ids = get_chain_ids_from_cif(cif_path)
+            h_chain = chain_ids[0] if len(chain_ids) >= 1 else "A"
+            l_chain = chain_ids[1] if args.task == "antibody" and len(chain_ids) >= 2 else ""
             if args.task == "antibody":
                 npz_path = interm / f"{cif_path.stem}.npz"
                 cdr = get_antibody_cdr_row(cif_path, npz_path)
                 if cdr is None:
                     cdr = {**DEFAULT_AB_CDR}
-                row = {"id": design_id, **cdr}
+                row = {"id": design_id, "h_chain": h_chain, "l_chain": l_chain, **cdr}
             else:
                 npz_path = interm / f"{cif_path.stem}.npz"
                 cdr = get_nanobody_cdr_row(cif_path, npz_path, args.nanobody_chain)
@@ -423,7 +432,7 @@ def main():
                         "l_cdr1_start": "", "l_cdr1_end": "", "l_cdr2_start": "", "l_cdr2_end": "",
                         "l_cdr3_start": "", "l_cdr3_end": "",
                     }
-                row = {"id": design_id, **cdr}
+                row = {"id": design_id, "h_chain": h_chain, "l_chain": l_chain, **cdr}
             cdr_rows.append(row)
 
     cdr_path = args.cdr_info_csv.resolve()

@@ -257,7 +257,11 @@ class ReFold:
             return None
     
     @staticmethod
-    def make_af3_json_from_backbone(backbone_path: Path, run_data_pipeline: bool, unpaired_msa_cache: dict|None = None, paired_msa_cache: dict|None = None, template_cache: dict|None = None):
+    def make_af3_json_from_backbone(backbone_path: Path, run_data_pipeline: bool, unpaired_msa_cache: dict|None = None, paired_msa_cache: dict|None = None, template_cache: dict|None = None, use_backbone_as_template: bool = False):
+        """
+        use_backbone_as_template: If True, use the backbone structure as template for all protein chains
+        (e.g. for antibody refold: fix same regions as inverse fold - scaffold + antigen).
+        """
         single_input = {
             "name": backbone_path.stem,
             "sequences": [],
@@ -339,10 +343,12 @@ class ReFold:
                         s["protein"]["pairedMsaPath"] = paired_msa_cache[sequence]
                     else:
                         s["protein"]["pairedMsa"] = ""
-                    if template_cache and sequence in template_cache:
+                    if use_backbone_as_template:
+                        s["protein"]["templatesPath"] = str(backbone_path.resolve())
+                    elif template_cache and sequence in template_cache:
                         s["protein"]["templatesPath"] = template_cache[sequence]
                     else:
-                        s["protein"]["templates"] = []    
+                        s["protein"]["templates"] = []
                 single_input["sequences"].append(s)
         return single_input
     
@@ -382,21 +388,35 @@ class ReFold:
         with open(output_dir, 'w') as f:
             json.dump(af3_input_list, f, indent=4)
     
-    def make_af3_json_multi_process(self, backbone_dir: str, output_path: str):
-        
+    def make_af3_json_multi_process(self, backbone_dir: str, output_path: str, use_backbone_as_template: bool = False):
+        """
+        use_backbone_as_template: If True (e.g. antibody pipeline), use each backbone as template
+        for its protein chains so AF3 fixes the same regions as inverse fold.
+        """
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         backbone_path_list = list(Path(backbone_dir).glob("*.pdb"))
         if len(backbone_path_list) == 0:
             print(f"Warning: No backbone PDB files found in {backbone_dir}, try cif format.")
             backbone_path_list = list(Path(backbone_dir).glob("*.cif"))
+        def _load_json_opt(attr_name):
+            try:
+                p = getattr(self.config.refold, attr_name, None)
+                if p and os.path.isfile(p):
+                    with open(p) as f:
+                        return json.load(f)
+            except (AttributeError, OSError, json.JSONDecodeError):
+                pass
+            return None
+        unpaired = _load_json_opt('unpaired_msa_cache')
+        paired = _load_json_opt('paired_msa_cache')
+        tmpl = _load_json_opt('template_cache')
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.config.refold.num_workers) as executor:
             futures = []
             for backbone_path in backbone_path_list:
                 future = executor.submit(
                     self.make_af3_json_from_backbone, backbone_path, self.config.refold.run_data_pipeline,
-                    unpaired_msa_cache=json.load(open(self.config.refold.unpaired_msa_cache)) if self.config.refold.unpaired_msa_cache else None,
-                    paired_msa_cache=json.load(open(self.config.refold.paired_msa_cache)) if self.config.refold.paired_msa_cache else None,
-                    template_cache=json.load(open(self.config.refold.template_cache)) if self.config.refold.template_cache else None
+                    unpaired_msa_cache=unpaired, paired_msa_cache=paired, template_cache=tmpl,
+                    use_backbone_as_template=use_backbone_as_template
                 )
                 futures.append(future)
             af3_input_list = [future.result() for future in concurrent.futures.as_completed(futures)]

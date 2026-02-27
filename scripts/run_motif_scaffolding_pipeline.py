@@ -69,16 +69,20 @@ def main(cfg: DictConfig):
     if motif_list is not None and isinstance(motif_list, list):
         motif_list = [str(m) for m in motif_list]
 
+    # Optional: limit samples per motif (e.g. 5 for quick test)
+    max_samples_per_motif = cfg.motif_scaffolding.get("max_samples_per_motif", None)
+
     # Run evaluation pipeline
     # This will:
-    # 1. Generator.run() -> Standardize model outputs
+    # 1. Generator.run() -> Standardize model outputs (if needed)
     # 2. InverseFold (ProteinMPNN) -> Sequence design
     # 3. ReFold (ESMFold) -> Structure prediction
     # 4. Calculate motif metrics (RMSD, novelty, diversity with alpha=5)
     results = motif_evaluation.run_motif_scaffolding_evaluation(
         design_dir=design_dir,
         pipeline_dir=pipeline_dir,
-        motif_list=motif_list
+        motif_list=motif_list,
+        max_samples_per_motif=max_samples_per_motif,
     )
 
     print(f"\n{'='*60}")

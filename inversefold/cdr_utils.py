@@ -100,27 +100,75 @@ def get_cdr_residue_set(cdr_ranges: Dict[str, Optional[Tuple[int, int]]],
     return cdr_residues
 
 
+def get_cdr_residue_set_from_pdb(
+    cdr_ranges: Dict[str, Optional[Tuple[int, int]]],
+    chain,
+    chain_type: str,  # 'H' or 'L'
+) -> Set[Tuple]:
+    """
+    Get set of (chain_id, res_id) tuples for residues in CDR regions.
+    Uses PDB residue numbering from the chain.
+    """
+    cdr_set = set()
+    cdr_names = ['h_cdr1', 'h_cdr2', 'h_cdr3'] if chain_type == 'H' else ['l_cdr1', 'l_cdr2', 'l_cdr3']
+    for cdr_name in cdr_names:
+        rng = cdr_ranges.get(cdr_name)
+        if rng is None:
+            continue
+        start, end = rng
+        for res in chain.get_residues():
+            res_id = res.get_id()
+            pdb_num = res_id[1] if isinstance(res_id, tuple) else res_id
+            if start <= pdb_num <= end:
+                cdr_set.add((chain.id, res_id))
+    return cdr_set
+
+
 def calculate_fixed_residues_for_antibody(
     pdb_path: Path,
     cdr_info_row: pd.Series,
-    heavy_chain_id: str = 'H',
-    light_chain_id: Optional[str] = 'L'
+    heavy_chain_id: Optional[str] = None,
+    light_chain_id: Optional[str] = None,
 ) -> List[str]:
     """
     Calculate fixed residues (scaffold) for antibody inverse folding.
     
-    Fixed residues = All residues EXCEPT CDR loops.
-    Format: "H123", "L456" (chain_id + residue_number)
+    Fixed residues:
+    - H chain: All residues EXCEPT CDR loops
+    - L chain: All residues EXCEPT CDR loops (if present; nanobody has no L)
+    - All other chains: ALL residues (antigen, etc.)
+    
+    Chain IDs come from cdr_info_row['h_chain'] and ['l_chain'].
+    Fallback to 'H' and 'L' if not provided (backward compatibility).
     
     Args:
         pdb_path: Path to PDB/CIF file
-        cdr_info_row: Pandas Series with CDR information
-        heavy_chain_id: Chain ID for heavy chain (default: 'H')
-        light_chain_id: Chain ID for light chain (default: 'L', None for nanobodies)
+        cdr_info_row: Pandas Series with CDR information (must include h_chain, l_chain for correct chain mapping)
+        heavy_chain_id: Override for H chain ID (if None, use cdr_info_row['h_chain'] or 'H')
+        light_chain_id: Override for L chain ID (if None, use cdr_info_row['l_chain'] or 'L'; empty for nanobody)
         
     Returns:
-        List of fixed residue identifiers in format "H123", "L456"
+        List of fixed residue identifiers in format "A123", "B456" (using actual chain IDs from structure)
     """
+    # Get chain IDs from CSV (required: design models must provide h_chain and l_chain)
+    h_chain = heavy_chain_id
+    if h_chain is None:
+        val = cdr_info_row.get('h_chain')
+        if pd.isna(val) or not str(val).strip():
+            raise ValueError(
+                "h_chain is required in CDR info CSV. "
+                "Design models must provide the heavy chain ID in the structure."
+            )
+        h_chain = str(val).strip()
+    
+    l_chain = light_chain_id
+    if l_chain is None:
+        val = cdr_info_row.get('l_chain')
+        if pd.notna(val) and str(val).strip() and str(val).strip() not in ('', 'nan'):
+            l_chain = str(val).strip()
+        else:
+            l_chain = None  # Nanobody: no light chain
+    
     # Parse structure
     parser = MMCIFParser(QUIET=True)
     try:
@@ -129,58 +177,49 @@ def calculate_fixed_residues_for_antibody(
         parser = PDBParser(QUIET=True)
         structure = parser.get_structure('antibody', str(pdb_path))
     
-    # Parse CDR ranges
     cdr_ranges = parse_cdr_ranges(cdr_info_row)
-    
-    # Get chain objects
     chains = list(structure.get_chains())
+    
     heavy_chain = None
     light_chain = None
+    other_chains = []
     
     for chain in chains:
-        if chain.id == heavy_chain_id:
+        if chain.id == h_chain:
             heavy_chain = chain
-        elif light_chain_id and chain.id == light_chain_id:
+        elif l_chain and chain.id == l_chain:
             light_chain = chain
+        else:
+            other_chains.append(chain)
     
     if heavy_chain is None:
-        raise ValueError(f"Heavy chain '{heavy_chain_id}' not found in structure")
+        raise ValueError(f"Heavy chain '{h_chain}' not found in structure. Available chains: {[c.id for c in chains]}")
     
     fixed_residues = []
     
-    # Get CDR residue sets using PDB residue IDs
+    # H chain: fix non-CDR
     heavy_cdr_set = get_cdr_residue_set_from_pdb(cdr_ranges, heavy_chain, 'H')
-    
-    # Process heavy chain
     for res in heavy_chain.get_residues():
         res_id = res.get_id()
-        res_key = (heavy_chain_id, res_id)
-        
-        # Check if this residue is in CDR
-        if res_key not in heavy_cdr_set:
-            # This is a scaffold residue - add to fixed list
-            if isinstance(res_id, tuple):
-                pdb_res_num = res_id[1]  # (hetflag, resnum, icode)
-            else:
-                pdb_res_num = res_id
-            fixed_residues.append(f"{heavy_chain_id}{pdb_res_num}")
+        if (h_chain, res_id) not in heavy_cdr_set:
+            pdb_res_num = res_id[1] if isinstance(res_id, tuple) else res_id
+            fixed_residues.append(f"{h_chain}{pdb_res_num}")
     
-    # Process light chain (if present)
+    # L chain: fix non-CDR (if present)
     if light_chain is not None:
         light_cdr_set = get_cdr_residue_set_from_pdb(cdr_ranges, light_chain, 'L')
-        
         for res in light_chain.get_residues():
             res_id = res.get_id()
-            res_key = (light_chain_id, res_id)
-            
-            # Check if this residue is in CDR
-            if res_key not in light_cdr_set:
-                # This is a scaffold residue - add to fixed list
-                if isinstance(res_id, tuple):
-                    pdb_res_num = res_id[1]
-                else:
-                    pdb_res_num = res_id
-                fixed_residues.append(f"{light_chain_id}{pdb_res_num}")
+            if (l_chain, res_id) not in light_cdr_set:
+                pdb_res_num = res_id[1] if isinstance(res_id, tuple) else res_id
+                fixed_residues.append(f"{l_chain}{pdb_res_num}")
+    
+    # All other chains: fix ALL residues (antigen, etc.)
+    for chain in other_chains:
+        for res in chain.get_residues():
+            res_id = res.get_id()
+            pdb_res_num = res_id[1] if isinstance(res_id, tuple) else res_id
+            fixed_residues.append(f"{chain.id}{pdb_res_num}")
     
     return fixed_residues
 
@@ -191,6 +230,8 @@ def load_cdr_info_csv(cdr_info_csv: str) -> pd.DataFrame:
     
     Required columns:
     - id: Identifier for the antibody (should match PDB filename)
+    - h_chain: Chain ID of heavy chain in the structure (required)
+    - l_chain: Chain ID of light chain in the structure (required for antibody, empty for nanobody)
     - h_cdr1_start, h_cdr1_end, h_cdr2_start, h_cdr2_end, h_cdr3_start, h_cdr3_end
     - l_cdr1_start, l_cdr1_end, l_cdr2_start, l_cdr2_end, l_cdr3_start, l_cdr3_end (optional for nanobodies)
     
@@ -203,7 +244,7 @@ def load_cdr_info_csv(cdr_info_csv: str) -> pd.DataFrame:
     df = pd.read_csv(cdr_info_csv)
     
     # Validate required columns
-    required_cols = ['id', 'h_cdr1_start', 'h_cdr1_end', 'h_cdr2_start', 'h_cdr2_end', 
+    required_cols = ['id', 'h_chain', 'l_chain', 'h_cdr1_start', 'h_cdr1_end', 'h_cdr2_start', 'h_cdr2_end',
                      'h_cdr3_start', 'h_cdr3_end']
     
     missing_cols = [col for col in required_cols if col not in df.columns]

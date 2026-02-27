@@ -52,6 +52,20 @@ DEFAULT_NANO_CDR = {
 }
 
 
+def get_chain_ids_from_pdb(pdb_path: Path) -> list:
+    """Return ordered list of chain IDs in the PDB. First = H, second = L (if antibody)."""
+    seen = set()
+    order = []
+    with open(pdb_path) as f:
+        for line in f:
+            if line.startswith("ATOM ") or line.startswith("HETATM"):
+                ch = line[21:22].strip()
+                if ch and ch not in seen:
+                    seen.add(ch)
+                    order.append(ch)
+    return order
+
+
 def main():
     ap = argparse.ArgumentParser(description="Convert RFantibody output to BenchCore design_dir + cdr_info.csv")
     ap.add_argument("--run_dirs", type=Path, required=True,
@@ -72,7 +86,7 @@ def main():
     design_dir.mkdir(parents=True, exist_ok=True)
 
     fieldnames = [
-        "id",
+        "id", "h_chain", "l_chain",
         "h_cdr1_start", "h_cdr1_end", "h_cdr2_start", "h_cdr2_end", "h_cdr3_start", "h_cdr3_end",
         "l_cdr1_start", "l_cdr1_end", "l_cdr2_start", "l_cdr2_end", "l_cdr3_start", "l_cdr3_end",
     ]
@@ -97,7 +111,10 @@ def main():
             dest = design_dir / f"{target_id}_{i}.pdb"
             shutil.copy2(src, dest)
         print(f"Copied {len(pdbs)} PDBs for {target_id} -> {design_dir}")
-        row = {"id": target_id, **default_cdr}
+        chain_ids = get_chain_ids_from_pdb(pdbs[0]) if pdbs else []
+        h_chain = chain_ids[0] if len(chain_ids) >= 1 else "A"
+        l_chain = chain_ids[1] if args.task == "antibody" and len(chain_ids) >= 2 else ""
+        row = {"id": target_id, "h_chain": h_chain, "l_chain": l_chain, **default_cdr}
         cdr_rows.append(row)
 
     cdr_path = args.cdr_info_csv.resolve()

@@ -159,26 +159,28 @@ Output: `assets/antibody_nanobody/antigens_cropped/{target_id}.pdb`. Model runne
 
 **CSV Format:**
 ```csv
-id,heavy_fv,light_fv,h_cdr1_start,h_cdr1_end,h_cdr2_start,h_cdr2_end,h_cdr3_start,h_cdr3_end,l_cdr1_start,l_cdr1_end,l_cdr2_start,l_cdr2_end,l_cdr3_start,l_cdr3_end
-01_PDL1,H,L,30,35,50,65,95,102,24,34,50,56,89,97
-02_TNFA,H,L,30,35,50,65,95,102,24,34,50,56,89,97
-12_AMBP,H,,30,35,50,65,95,102,,,,,,
+id,h_chain,l_chain,h_cdr1_start,h_cdr1_end,h_cdr2_start,h_cdr2_end,h_cdr3_start,h_cdr3_end,l_cdr1_start,l_cdr1_end,l_cdr2_start,l_cdr2_end,l_cdr3_start,l_cdr3_end
+01_PDL1,A,B,30,35,50,65,95,102,24,34,50,56,89,97
+02_TNFA,A,B,30,35,50,65,95,102,24,34,50,56,89,97
+12_AMBP,A,,30,35,50,65,95,102,,,,,,
 ```
 
 **Column Descriptions:**
 - `id`: **Must match target name** (e.g., `01_PDL1`, `12_AMBP`) - used for PDB file matching
-- `heavy_fv`: Heavy chain ID (typically 'H')
-- `light_fv`: Light chain ID (typically 'L', empty for nanobodies/VHH)
-- `h_cdr1_start`, `h_cdr1_end`: Heavy chain CDR1 range (1-based, inclusive)
-- `h_cdr2_start`, `h_cdr2_end`: Heavy chain CDR2 range (1-based, inclusive)
-- `h_cdr3_start`, `h_cdr3_end`: Heavy chain CDR3 range (1-based, inclusive)
+- `h_chain`: **Required**. Chain ID of heavy chain in the structure (e.g., A, H). Design models must provide this.
+- `l_chain`: **Required for antibody**. Chain ID of light chain in the structure (e.g., B, L). Empty for nanobody/VHH.
+- `h_cdr1_start`, `h_cdr1_end`: Heavy chain CDR1 range (1-based, inclusive, PDB numbering)
+- `h_cdr2_start`, `h_cdr2_end`: Heavy chain CDR2 range (1-based, inclusive, PDB numbering)
+- `h_cdr3_start`, `h_cdr3_end`: Heavy chain CDR3 range (1-based, inclusive, PDB numbering)
 - `l_cdr1_start`, `l_cdr1_end`: Light chain CDR1 range (optional, for nanobodies must be empty)
 - `l_cdr2_start`, `l_cdr2_end`: Light chain CDR2 range (optional, for nanobodies must be empty)
 - `l_cdr3_start`, `l_cdr3_end`: Light chain CDR3 range (optional, for nanobodies must be empty)
 
-**CDR-Based Scaffold Fixing:**
-- During inverse folding, **all residues EXCEPT the 3 CDR loops are fixed**
-- This ensures only CDR regions are redesigned, keeping the scaffold constant
+**CDR-Based Scaffold Fixing (Inverse Fold):**
+- **H chain**: Fix all residues EXCEPT CDR1, CDR2, CDR3
+- **L chain**: Fix all residues EXCEPT CDR1, CDR2, CDR3 (if present; nanobody has no L chain)
+- **All other chains** (antigen, etc.): Fix ALL residues
+- Chain IDs (`h_chain`, `l_chain`) must match the actual chain IDs in the PDB/CIF. Fallback to 'H' and 'L' if columns are missing (legacy).
 - Matching is done by extracting target name from PDB filename (e.g., `01_PDL1_0.pdb` → `01_PDL1`)
 
 **Scaffold Whitelist & Compliance**
@@ -555,12 +557,12 @@ python scripts/run_antibody_pipeline.py \
 
 **CDR CSV Example:**
 ```csv
-id,heavy_fv,light_fv,h_cdr1_start,h_cdr1_end,h_cdr2_start,h_cdr2_end,h_cdr3_start,h_cdr3_end,l_cdr1_start,l_cdr1_end,l_cdr2_start,l_cdr2_end,l_cdr3_start,l_cdr3_end
-01_7UXQ,H,L,30,35,50,65,95,102,24,34,50,56,89,97
-02_1TNF,H,L,30,35,50,65,95,102,24,34,50,56,89,97
-12_1BI7,H,,30,35,50,65,95,102,,,,,,
-21_6COB,H,L,30,35,50,65,95,102,24,34,50,56,89,97
-22_7WPC,H,L,30,35,50,65,95,102,24,34,50,56,89,97
+id,h_chain,l_chain,h_cdr1_start,h_cdr1_end,h_cdr2_start,h_cdr2_end,h_cdr3_start,h_cdr3_end,l_cdr1_start,l_cdr1_end,l_cdr2_start,l_cdr2_end,l_cdr3_start,l_cdr3_end
+01_7UXQ,A,B,30,35,50,65,95,102,24,34,50,56,89,97
+02_1TNF,A,B,30,35,50,65,95,102,24,34,50,56,89,97
+12_1BI7,A,,30,35,50,65,95,102,,,,,,
+21_6COB,A,B,30,35,50,65,95,102,24,34,50,56,89,97
+22_7WPC,A,B,30,35,50,65,95,102,24,34,50,56,89,97
 ```
 
 **Target Configuration:**

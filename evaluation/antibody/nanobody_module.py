@@ -337,21 +337,18 @@ class NanobodyDesignModule:
     def calculate_fixed_residues(self, pdb_path: Path, cdr_row: pd.Series) -> List[str]:
         """
         Calculate fixed residues for nanobody inverse folding.
-        Fixed residues = All residues EXCEPT CDR loops.
-        Note: VHH only has heavy chain, no light chain.
+        Fixed residues: H chain non-CDR + ALL other chains (antigen).
+        Note: VHH has no light chain; l_chain should be empty in CDR CSV.
         
         Args:
             pdb_path: Path to PDB file
-            cdr_row: CDR information row from CSV (should only have heavy chain CDRs)
+            cdr_row: CDR information row (must include h_chain; l_chain empty for nanobody)
             
         Returns:
-            List of fixed residue identifiers (e.g., ["H1", "H2", ...])
+            List of fixed residue identifiers (e.g., ["A1", "A2", "B1", ...] using actual chain IDs)
         """
         from inversefold.cdr_utils import calculate_fixed_residues_for_antibody
-        # For VHH, we only process heavy chain, light_chain_id should be None
         return calculate_fixed_residues_for_antibody(
-            pdb_path, 
-            cdr_row,
-            heavy_chain_id='H',
-            light_chain_id=None
+            pdb_path, cdr_row,
+            light_chain_id=None  # VHH: no light chain
         )

@@ -1,5 +1,6 @@
 algorithms/odesign/InverseFold/ckpts/
 refold/esmfold/weights/
+inversefold/LigandMPNN/model_params/
 output/
 assets/antigen_nanobody/antigens/
 assets/antigen_nanobody/scripts/
