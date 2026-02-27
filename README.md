@@ -1,12 +1,12 @@
-# BenchCore Input Contract
+# DesignBench Input Contract
 
 ## Overview
 
-BenchCore is a **multi-task evaluation framework** supporting various protein design tasks. Each task type has specific input format requirements. All model-specific preprocessing (e.g., PPIFlow's Poly-Ala fix) must be done **before** passing data to BenchCore.
+DesignBench is a **multi-task evaluation framework** supporting various protein design tasks. Each task type has specific input format requirements. All model-specific preprocessing (e.g., PPIFlow's Poly-Ala fix) must be done **before** passing data to DesignBench.
 
 ## General Principles
 
-1. **Standardized Format**: BenchCore expects standardized input formats, not raw model outputs
+1. **Standardized Format**: DesignBench expects standardized input formats, not raw model outputs
 2. **Preprocessing Responsibility**: Users/external scripts handle model-specific data conversion
 3. **Task-Specific Requirements**: Different tasks may require different metadata files
 
@@ -62,8 +62,31 @@ design_dir/
 **Pipeline:**
 1. Preprocess: `format_output_pdb()` → `formatted_designs/`
 2. Inverse Fold: LigandMPNN → `inverse_fold/`
-3. Refold: AlphaFold3 → `refold/af3_out/`
+3. Refold: AlphaFold3 → `refold/af3_out/` (sequence-only prediction)
 4. Evaluate: `run_protein_binding_protein_evaluation()`
+
+**PBP 11-Target Benchmark**
+
+Fixed set of 11 protein targets. For each target, the **design** is chain A (binder) and the **target** is chain B. Reference structures (one complex per target) are in `assets/pbp/target/` (e.g. `CD3d.pdb`, `EGFR.pdb`). Target list and required design lengths (chain A length) are in `assets/pbp/config/target_config.csv`.
+
+| target_id | design_length | description |
+|-----------|---------------|-------------|
+| CD3d      | 63            | CD3 delta |
+| EGFR      | 191           | EGFR |
+| EGFR2     | 101           | FGFR2 (EGFR2) |
+| H3        | 210           | Influenza H3 |
+| IL7Ra     | 193           | IL-7 receptor alpha |
+| InsulinR  | 150           | Insulin receptor |
+| PDGFR     | 187           | PDGFR |
+| TGFb      | 82            | TGF-beta |
+| Tie2      | 141           | Tie2 |
+| TrkA      | 101           | TrkA |
+| VirB8     | 138           | VirB8 |
+
+**Requirements:**
+- **100 designs per target.** Submit exactly 100 design structures for each of the 11 targets (e.g. `CD3d_0.pdb` … `CD3d_99.pdb`).
+- Each design is a **protein–protein complex** (PDB): **chain A** = designed binder (length must equal the `design_length` in the table above for that target); **chain B** = fixed target.
+- Naming: `{target_id}_{index}.pdb` with `index` 0–99 (e.g. `CD3d_0.pdb`, `EGFR_42.pdb`).
 
 ---
 
@@ -125,7 +148,7 @@ Cropped antigens live under `assets/antibody_nanobody/antigens_cropped/` and are
 Generate cropped PDBs (requires `biopython`):
 
 ```bash
-# From benchcore repo root
+# From designbench repo root
 python assets/antibody_nanobody/scripts/crop_antigens_for_benchmark.py
 # Optional: --distance 20 (default), --dry_run
 ```
@@ -258,9 +281,27 @@ Sequence | Target | Scaffold | Count | Status
 2. **Compliance Report**: Generate and display pre-run compliance report
 3. Preprocess: Format designs → `formatted_designs/`
 4. Inverse Fold: LigandMPNN (with CDR-based scaffold fixing) → `inverse_fold/`
-5. Refold: AlphaFold3 → `refold/af3_out/`
-6. Evaluate: `run_protein_binding_protein_evaluation()`
-7. Developability: `run_antibody_developability_evaluation()` (uses CDR info from CSV)
+5. Refold: AlphaFold3 → `refold/af3_out/` (sequence-only; see note below)
+6. **Step 5 (Evaluation)** — all in `run_antibody_pipeline.py`:
+   - **PBP evaluation**: `run_protein_binding_protein_evaluation()` → `raw_data.csv`
+   - **Interface analysis**: `run_antibody_interface_analysis()` → `interface_metrics.csv` (optional; disable with `enable_interface_analysis: false`)
+   - **Developability**: `run_antibody_developability_evaluation()` → `developability_metrics.csv` (requires `cdr_info_csv`)
+
+**Start from a specific step (`start_step`):**  
+Set `start_step=5` to re-run only Step 5 (PBP evaluation + interface analysis + developability). Use the same config `root` (and Hydra `run.dir`) as the run that produced `refold/af3_out/` and `inverse_fold/backbones/`.
+
+- **With `cdr_info_csv`:** runs both PBP evaluation and developability.
+- **Without `cdr_info_csv`:** runs only PBP evaluation (writes `raw_data.csv`); developability is skipped.
+
+Example:
+```bash
+# From project root; pipeline_dir = e.g. output/rfantibody/results
+python scripts/run_antibody_pipeline.py start_step=5
+# With developability (provide CDR CSV):
+python scripts/run_antibody_pipeline.py start_step=5 cdr_info_csv=/path/to/cdr_info.csv
+```
+
+**Refold (AlphaFold3) note:** The AF3 refold step uses **sequence-only** input (no custom templates). The inverse-fold step fixes non-CDR scaffold; AF3 then predicts structure from the designed sequences without constraining non-CDR regions. CDR-only refold (fixing scaffold + antigen in AF3) is not supported by the current AF3 container format.
 
 ---
 
@@ -414,37 +455,11 @@ sample_num,motif_placements
 
 ---
 
-### 9. Antigen-Antibody Interface Analysis (`run_interface_pipeline.py`)
+#### Antigen-Antibody Interface Analysis (Antibody Step 5)
 
-**Input Format:**
-- Directory containing CIF files (antigen-antibody complexes)
+Interface analysis is **part of** `run_antibody_pipeline.py` Step 5: it runs after PBP evaluation, on the same `refold/af3_out/` CIFs, and writes `interface_metrics.csv`. Disable with `enable_interface_analysis: false` in config.
 
-**Directory Structure:**
-```
-design_dir/
-├── complex_0.cif
-├── complex_1.cif
-└── complex_2.cif
-```
-
-**Requirements:**
-- ✅ CIF format files (mmCIF)
-- ✅ Antigen-antibody complexes
-- ✅ Chain IDs: Typically 'H'/'L' for antibody, others for antigen
-- ✅ Can specify chain IDs via config
-
-**Pipeline:**
-1. Preprocess: Format designs → `formatted_designs/`
-2. Inverse Fold: LigandMPNN → `inverse_fold/`
-3. Refold: AlphaFold3 → `refold/af3_out/`
-4. Evaluate: `run_protein_binding_protein_evaluation()`
-5. Interface Analysis: `InterfaceAnalyzer.analyze_interface()` (if enabled)
-
-**Interface Analysis Metrics:**
-- Geometry: Paratope/Epitope size, BSA, Epitope patches
-- Interactions: Hydrophobic clusters, Hydrogen bonds
-- Composition: Paratope composition, Charge complementarity
-- Structure: Epitope secondary structure, Segmentation
+**Metrics:** Paratope/epitope size, BSA, epitope patches, hydrophobic clusters, hydrogen bonds, paratope composition, charge complementarity, epitope secondary structure. Chain IDs: configurable via `ab_chain_ids` / `ag_chain_ids` (default antibody B,C and antigen A).
 
 ---
 
@@ -472,24 +487,24 @@ design_dir/
 - Ensure correct file naming conventions
 - Validate structure integrity
 
-**BenchCore Responsibility:**
+**DesignBench Responsibility:**
 - Load standardized inputs
 - Run Inverse Folding
-- Run Refolding
+- Run Refolding (AF3 refold is sequence-only; no custom template/region fixing)
 - Calculate metrics
 
 ---
 
 ## Validation
 
-BenchCore will validate:
+DesignBench will validate:
 - ✅ Input directory exists
 - ✅ Required files found (PDB/CIF)
 - ✅ Metadata file format (if required)
 - ✅ Required columns present (for task-specific requirements)
 - ✅ File format compatibility
 
-If validation fails, BenchCore will raise clear error messages indicating what is missing.
+If validation fails, DesignBench will raise clear error messages indicating what is missing.
 
 ---
 
@@ -533,9 +548,22 @@ python scripts/run_antibody_pipeline.py \
     max_designs_per_target=100 \
     proceed_with_warnings=false \
     gpus=0,1
-# Optional: scaffolds_dir=assets/antibody_nanobody/scaffolds  (default; override if needed)
+```
+
+**Quick validation (first target, first design only):**
+```bash
+python scripts/run_antibody_pipeline.py \
+    design_dir=/path/to/boltzgen_output/antibody_benchcore_1per/design_dir \
+    antibody_type=antibody \
+    cdr_info_csv=/path/to/boltzgen_output/antibody_benchcore_1per/cdr_info.csv \
+    target_config_path=assets/antibody_nanobody/config/target_config.csv \
+    max_designs_per_target=1 \
+    max_targets=1 \
+    gpus=0
+```
 
 # VHH (nanobody)
+```bash
 python scripts/run_antibody_pipeline.py \
     design_dir=/path/to/nanobodies \
     antibody_type=nanobody \
@@ -591,7 +619,7 @@ python scripts/run_interface_pipeline.py \
     gpus=0
 ``` 
 
-# BenchCore Usage Example
+# DesignBench Usage Example
 
 ## 1. Protein Evaluation 
 
@@ -805,21 +833,16 @@ evaluator.run_protein_binding_nuc_evaluation(
 )
 ```
 
-### Therapeutic Antibody/Nanobody Profile
+### Therapeutic Antibody/Nanobody Profile (Developability)
+
+Developability is run inside **Step 5** of `run_antibody_pipeline.py`. To run the same evaluation standalone (e.g. on an existing `refold/af3_out/` directory):
 
 ```
-# basic usage
-python benchcore/scripts/run_developability_evaluation.py \
-    --csv_file antibodies_fv.csv \
-    --results_dir ./af3_results \
-    --output developability_metrics.csv
+# Same API as pipeline Step 5; results_dir = pipeline root (contains refold/af3_out)
+python scripts/run_developability_evaluation.py cdr_info.csv ./output/rfantibody/results --output developability_metrics.csv
 
-# test single antibody
-python benchcore/scripts/run_developability_evaluation.py \
-    --csv_file antibodies_fv.csv \
-    --results_dir ./af3_results \
-    --antibody-id AB001 \
-    --output test_metrics.csv
+# Single design
+python scripts/run_developability_evaluation.py cdr_info.csv ./output/rfantibody/results --antibody-id 01_7UXQ --num-seeds 8
 ```
 
 ## General Pattern

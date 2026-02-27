@@ -281,8 +281,9 @@ class ReFold:
     @staticmethod
     def make_af3_json_from_backbone(backbone_path: Path, run_data_pipeline: bool, unpaired_msa_cache: dict|None = None, paired_msa_cache: dict|None = None, template_cache: dict|None = None, use_backbone_as_template: bool = False):
         """
-        use_backbone_as_template: If True, use the backbone structure as template for all protein chains
-        (e.g. for antibody refold: fix same regions as inverse fold - scaffold + antigen).
+        Build AF3 input JSON from backbone PDB/CIF (sequences only).
+        use_backbone_as_template is ignored: the AF3 container does not support custom templates
+        (templatesPath is rejected). Refold is sequence-based only (no CDR-only or scaffold fixing).
         """
         single_input = {
             "name": backbone_path.stem,
@@ -421,8 +422,8 @@ class ReFold:
     
     def make_af3_json_multi_process(self, backbone_dir: str, output_path: str, use_backbone_as_template: bool = False):
         """
-        use_backbone_as_template: If True (e.g. antibody pipeline), use each backbone as template
-        for its protein chains so AF3 fixes the same regions as inverse fold.
+        Build AF3 input JSON from all backbones in backbone_dir (sequence-only; no template).
+        use_backbone_as_template is ignored (AF3 container does not support custom templates).
         """
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         backbone_path_list = list(Path(backbone_dir).glob("*.pdb"))

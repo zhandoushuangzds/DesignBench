@@ -15,6 +15,7 @@ from evaluation.metrics.usalign import USalign
 from evaluation.metrics.foldseek import FoldSeek
 from evaluation.metrics.analyze import calc_hydrophobicity, count_noncovalents
 from evaluation.metrics.developability import DevelopabilityScorer
+from evaluation.metrics.interface_analysis import InterfaceAnalyzer
 import json
 import glob
 
@@ -36,26 +37,93 @@ class Evaluation():
         Returns:
             str: protein sequence, if not found return empty string
         """
-        # read sequence from LigandMPNN/ProteinMPNN output fasta file
+        import re
+
+        # Optional seed index: sample names like "01_7UXQ_0-7" -> seed_idx=7
+        seed_idx = None
+        if "-" in sample_name:
+            tail = sample_name.rsplit("-", 1)[1]
+            if tail.isdigit():
+                seed_idx = int(tail)
+
+        def _read_fasta_for_seed(fasta_file: Path, seed_index: int | None) -> str:
+            """
+            Read a multi-fasta from LigandMPNN.
+            - If seed_index is given, try to return the sequence whose header has matching id=N
+              (e.g. \">01_7UXQ_0, id=7, ...\").
+            - If no explicit id is found, fall back to N-th sequence in the file (1-based).
+            - If seed_index is None, return the first sequence.
+            """
+            try:
+                with open(fasta_file, "r") as f:
+                    lines = [l.rstrip("\n") for l in f]
+            except Exception:
+                return ""
+
+            sequences = []
+            current_header = None
+            current_seq = None
+
+            for line in lines:
+                if line.startswith(">"):
+                    # flush previous
+                    if current_header is not None and current_seq is not None:
+                        sequences.append((current_header, current_seq))
+                    current_header = line[1:].strip()
+                    current_seq = ""
+                else:
+                    if current_header is not None:
+                        current_seq += line.strip()
+
+            if current_header is not None and current_seq is not None:
+                sequences.append((current_header, current_seq))
+
+            if not sequences:
+                return ""
+
+            # If no specific seed requested, return first sequence
+            if seed_index is None:
+                seq = sequences[0][1]
+                seq = seq.replace(":", "").replace(";", "")
+                return seq.upper()
+
+            # Try to match by explicit "id=N" in header
+            for header, seq in sequences:
+                m = re.search(r"id=(\\d+)", header)
+                if m and int(m.group(1)) == seed_index:
+                    seq = seq.replace(":", "").replace(";", "")
+                    return seq.upper()
+
+            # Fallback: use N-th sequence if available (1-based)
+            idx = seed_index - 1
+            if 0 <= idx < len(sequences):
+                seq = sequences[idx][1]
+                seq = seq.replace(":", "").replace(";", "")
+                return seq.upper()
+
+            # Final fallback: first sequence
+            seq = sequences[0][1]
+            seq = seq.replace(":", "").replace(";", "")
+            return seq.upper()
+
         seqs_dir = os.path.join(pipeline_dir, "inverse_fold", "seqs")
-        if os.path.exists(seqs_dir):
-            # find matching fasta file
-            for fasta_file in Path(seqs_dir).glob(f"{sample_name}*.fa"):
-                try:
-                    with open(fasta_file, 'r') as f:
-                        lines = f.readlines()
-                        # FASTA format: first line is header, second line is sequence
-                        for i, line in enumerate(lines):
-                            if line.startswith('>'):
-                                if i + 1 < len(lines):
-                                    seq = lines[i + 1].strip()
-                                    # remove possible chain separators (e.g. ':')
-                                    seq = seq.replace(':', '').replace(';', '')
-                                    return seq.upper()
-                except Exception as e:
-                    continue
-        
-        # if no fasta file is found, return empty string
+        if not os.path.exists(seqs_dir):
+            return ""
+
+        # Try exact sample_name first (rare; usually we only have design-level .fa)
+        for fasta_file in Path(seqs_dir).glob(f"{sample_name}*.fa"):
+            seq = _read_fasta_for_seed(fasta_file, seed_idx)
+            if seq:
+                return seq
+
+        # Fallback: design-level .fa (e.g. 01_7UXQ_0.fa) that contains multiple sequences (seeds)
+        design_name = sample_name.rsplit("-", 1)[0] if "-" in sample_name else sample_name
+        if design_name:
+            for fasta_file in Path(seqs_dir).glob(f"{design_name}*.fa"):
+                seq = _read_fasta_for_seed(fasta_file, seed_idx)
+                if seq:
+                    return seq
+
         return ""
     
 
@@ -472,14 +540,12 @@ class Evaluation():
                     print(f"{refold_path} fail for calculate rmsd, set to inf, please check the case")
                 plddt, ipae, min_ipae, iptm, ptm_binder = Confidence.gather_af3_confidence(confidence_path, summary_confidence_path, inverse_fold_path)
                 
-                # Calculate hydrophobicity and noncovalents
-                # Use sequence from inversefold output (designed sequence) for hydrophobicity calculation
-                # noncovalents need to be calculated from refolded structure files
+                # Hydrophobicity from inverse_fold sequence (try design name if seed name has no .fa)
                 sample_name_no_ext = os.path.splitext(sample_name)[0]
                 sequence = Evaluation._get_sequence_from_inversefold(pipeline_dir, sample_name_no_ext)
-                # If inversefold sequence not found, skip hydrophobicity calculation
                 hydrophobicity = calc_hydrophobicity(sequence) if sequence else np.nan
-                noncovalents = count_noncovalents(str(refold_path))
+                # Interface-only: H-bonds and salt bridges between chains (antigen-antibody)
+                noncovalents = count_noncovalents(str(refold_path), interface_only=True)
                 
                 result_data = {
                     'ca_rmsd': ca_rmsd,
@@ -493,7 +559,7 @@ class Evaluation():
                     'num_salt_bridges': noncovalents.get('num_salt_bridges', 0),
                 }
                 return sample_name, result_data
-                
+            
             except Exception as e:
                 print(f"Warning: Error processing {refold_path.name}: {e}")
                 return None, None
@@ -997,3 +1063,53 @@ class Evaluation():
             print(f"   TNP (Nanobody): {tnp_count}")
         
         return result_df
+
+    def run_antibody_interface_analysis(
+        self,
+        pipeline_dir: str,
+        output_csv: str,
+        ab_chain_ids=None,
+        ag_chain_ids=None,
+    ):
+        """
+        Run antigen-antibody interface analysis on AF3 refold CIFs (Step 5 of antibody pipeline).
+        Writes one row per structure to output_csv with flattened interface metrics.
+        """
+        if ab_chain_ids is None:
+            ab_chain_ids = getattr(self.config, 'ab_chain_ids', ['B', 'C'])  # H, L
+        if ag_chain_ids is None:
+            ag_chain_ids = getattr(self.config, 'ag_chain_ids', ['A'])
+        af3_out = os.path.join(pipeline_dir, "refold", "af3_out")
+        if not os.path.isdir(af3_out):
+            print(f"⏭ Skipping interface analysis (no refold/af3_out at {af3_out})")
+            return None
+        all_cif = list(Path(af3_out).rglob("*_model.cif"))
+        if not all_cif:
+            print(f"⏭ Skipping interface analysis (no *_model.cif in {af3_out})")
+            return None
+        analyzer = InterfaceAnalyzer()
+        rows = []
+        for cif_path in tqdm.tqdm(all_cif, desc="interface analysis"):
+            sample_id = cif_path.parent.name
+            try:
+                out = analyzer.analyze_interface(str(cif_path), ab_chain_ids=ab_chain_ids, ag_chain_ids=ag_chain_ids)
+            except Exception as e:
+                print(f"Warning: interface analysis failed for {cif_path.name}: {e}")
+                continue
+            if out is None:
+                continue
+            row = {'sample_id': sample_id}
+            for category, metrics in out.items():
+                if isinstance(metrics, dict):
+                    for k, v in metrics.items():
+                        row[k] = v
+                else:
+                    row[category] = metrics
+            rows.append(row)
+        if not rows:
+            print("⏭ No interface metrics collected.")
+            return None
+        df = pd.DataFrame(rows)
+        df.to_csv(output_csv, index=False)
+        print(f"✅ Interface metrics saved to {output_csv} ({len(df)} structures)")
+        return df

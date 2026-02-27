@@ -23,6 +23,8 @@ import os
 import subprocess
 import sys
 import time
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
@@ -123,6 +125,19 @@ def main():
     ap.add_argument("--proteinmpnn_cmd", type=str, default="proteinmpnn")
     ap.add_argument("--qvextract_cmd", type=str, default="qvextract")
     ap.add_argument("--skip_convert", action="store_true", help="Do not run BenchCore format conversion at end")
+    ap.add_argument(
+        "--target_slice",
+        type=str,
+        default=None,
+        help="Optional subset of targets as 'start-end' (1-based, inclusive), e.g. 1-11, to split work across GPUs.",
+    )
+    ap.add_argument(
+        "--max_concurrent_targets",
+        type=int,
+        default=1,
+        help="Maximum number of targets to run in parallel on this GPU (per task). "
+             "Use >1 to let one GPU handle multiple targets simultaneously.",
+    )
     args = ap.parse_args()
 
     benchcore_root = args.benchcore_root.resolve()
@@ -140,6 +155,25 @@ def main():
     targets = load_target_config(benchcore_root)
     target_ids = [r.get("target_id", (list(r.values())[0] if r else "") or "").strip() for r in targets]
     target_ids = [t for t in target_ids if t and t != "target_id"]
+
+    selected_target_ids: set[str] | None = None
+    if args.target_slice:
+        try:
+            start_s, end_s = args.target_slice.split("-", 1)
+            start_i = int(start_s)
+            end_i = int(end_s)
+            if start_i < 1 or end_i < start_i or end_i > len(target_ids):
+                raise ValueError
+        except Exception:
+            raise SystemExit(
+                f"Invalid --target_slice '{args.target_slice}'. Use 'start-end' with 1 <= start <= end <= {len(target_ids)}."
+            )
+        selected_list = target_ids[start_i - 1 : end_i]
+        selected_target_ids = set(selected_list)
+        print(
+            f"Using target slice {start_i}-{end_i}: {len(selected_list)} targets "
+            f"out of {len(target_ids)} total."
+        )
 
     out_root = args.output_dir.resolve()
     out_root.mkdir(parents=True, exist_ok=True)
@@ -237,158 +271,204 @@ def main():
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     timing_log = out_root / f"rfantibody_timing_{timestamp}.csv"
     timing_records = []
+    fieldnames = [
+        "task",
+        "target_id",
+        "status",
+        "rfdiffusion_seconds",
+        "proteinmpnn_seconds",
+        "qvextract_seconds",
+        "total_seconds",
+        "error",
+        "timestamp",
+    ]
+    # Initialize log file with header so that even if interrupted, partial timing is recorded.
+    with open(timing_log, "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fieldnames)
+        w.writeheader()
+    write_lock = threading.Lock()
     total_wall_start = time.time()
 
     print(f"RFantibody with timing — GPU: {args.gpu}, Tasks: {tasks}, Targets: {len(target_ids)}, Num designs: {args.num_designs}")
     print(f"Timing log: {timing_log}")
     print("=" * 80)
 
-    for task in tasks:
+    def _append_timing_row(rec: dict) -> None:
+        """Append a single timing record to CSV immediately (thread-safe) and keep in-memory copy."""
+        if not rec:
+            return
+        timing_records.append(rec)
+        with write_lock:
+            with open(timing_log, "a", newline="") as f:
+                w = csv.DictWriter(f, fieldnames=fieldnames)
+                w.writerow(rec)
+
+    def _run_single_target(task: str, row_idx: int, row: dict) -> dict:
+        nonlocal benchcore_root, work_dir, framework_map, loops_ab, loops_nano
+
+        target_id = row.get("target_id", "").strip() or (list(row.values())[0] if row else "")
+        if not target_id or target_id == "target_id":
+            return {}
+        if selected_target_ids is not None and target_id not in selected_target_ids:
+            return {}
+
         run_dir = out_root / task
         run_dir.mkdir(parents=True, exist_ok=True)
         framework = framework_map[task]
         loops = loops_ab if task == "antibody" else loops_nano
 
-        print(f"\n{'='*80}\nTask: {task.upper()}\n{'='*80}\n")
+        target_pdb = antigen_pdb_for_target(benchcore_root, target_id, work_dir, ensure_target_pdb)
+        if not target_pdb:
+            print(f"[{row_idx}/{len(targets)}] Skip {target_id}: no antigen PDB", file=sys.stderr)
+            return {
+                "task": task,
+                "target_id": target_id,
+                "status": "skipped",
+                "rfdiffusion_seconds": 0.0,
+                "proteinmpnn_seconds": 0.0,
+                "qvextract_seconds": 0.0,
+                "total_seconds": 0.0,
+                "error": "No antigen PDB",
+                "timestamp": datetime.now().isoformat(),
+            }
 
-        for idx, row in enumerate(targets, 1):
-            target_id = row.get("target_id", "").strip() or (list(row.values())[0] if row else "")
-            if not target_id or target_id == "target_id":
-                continue
+        hotspots_raw = (row.get("target_hotspots") or "").strip()
+        hotspots = ",".join(h.strip() for h in hotspots_raw.split(",") if h.strip()) if hotspots_raw else None
+        target_out = run_dir / target_id
+        target_out.mkdir(parents=True, exist_ok=True)
+        qv1 = target_out / "rfdiffusion.qv"
+        qv2 = target_out / "proteinmpnn.qv"
+        extracted_dir = target_out / "extracted"
 
-            # 优先使用 assets/antigens_cropped 中已裁剪 PDB，否则从 CIF 转 PDB（裁剪逻辑在 assets 脚本中，与 RFantibody 解耦）
-            target_pdb = antigen_pdb_for_target(benchcore_root, target_id, work_dir, ensure_target_pdb)
-            if not target_pdb:
-                print(f"[{idx}/{len(target_ids)}] Skip {target_id}: no antigen PDB", file=sys.stderr)
-                timing_records.append({
-                    "task": task,
-                    "target_id": target_id,
-                    "status": "skipped",
-                    "rfdiffusion_seconds": 0.0,
-                    "proteinmpnn_seconds": 0.0,
-                    "qvextract_seconds": 0.0,
-                    "total_seconds": 0.0,
-                    "error": "No antigen PDB",
-                    "timestamp": datetime.now().isoformat(),
-                })
-                continue
+        t_rf, t_pm, t_qv = 0.0, 0.0, 0.0
+        status = "success"
+        err_msg = ""
 
-            hotspots_raw = (row.get("target_hotspots") or "").strip()
-            hotspots = ",".join(h.strip() for h in hotspots_raw.split(",") if h.strip()) if hotspots_raw else None
-            target_out = run_dir / target_id
-            target_out.mkdir(parents=True, exist_ok=True)
-            qv1 = target_out / "rfdiffusion.qv"
-            qv2 = target_out / "proteinmpnn.qv"
-            extracted_dir = target_out / "extracted"
+        # 1. rfdiffusion
+        cmd_rf = [
+            args.rfdiffusion_cmd,
+            "-t", str(target_pdb.resolve()),
+            "-f", framework,
+            "-q", str(qv1.resolve()),
+            "-n", str(args.num_designs),
+            "-l", loops,
+        ]
+        if weights_rf:
+            cmd_rf += ["-w", weights_rf]
+        if hotspots:
+            cmd_rf += ["-h", hotspots]
+        if args.rfdiffusion_extra:
+            for e in args.rfdiffusion_extra:
+                cmd_rf += ["-e", e]
+        print(f"[{row_idx}/{len(targets)}] {task} {target_id} rfdiffusion...", flush=True)
+        ok_rf, t_rf, err_rf = run_cmd_with_timing(cmd_rf, rf_cwd, base_env, "rfdiffusion")
+        if not ok_rf:
+            status = "failed"
+            err_msg = f"rfdiffusion: {err_rf}"
+            print(f"[{row_idx}/{len(targets)}] {task} {target_id} rfdiffusion FAILED ({t_rf:.1f}s)")
+            return {
+                "task": task,
+                "target_id": target_id,
+                "status": status,
+                "rfdiffusion_seconds": round(t_rf, 2),
+                "proteinmpnn_seconds": 0.0,
+                "qvextract_seconds": 0.0,
+                "total_seconds": round(t_rf, 2),
+                "error": err_msg,
+                "timestamp": datetime.now().isoformat(),
+            }
+        print(f"[{row_idx}/{len(targets)}] {task} {target_id} rfdiffusion {t_rf:.1f}s")
 
-            t_rf, t_pm, t_qv = 0.0, 0.0, 0.0
-            status = "success"
-            err_msg = ""
-
-            # 1. rfdiffusion
-            cmd_rf = [
-                args.rfdiffusion_cmd,
-                "-t", str(target_pdb.resolve()),
-                "-f", framework,
+        # 2. proteinmpnn (optional; default skip)
+        run_pm = getattr(args, "run_proteinmpnn", False)
+        qv_for_extract = qv1  # default: extract from rfdiffusion output (backbone only)
+        if run_pm:
+            cmd_pm = [
+                args.proteinmpnn_cmd,
                 "-q", str(qv1.resolve()),
-                "-n", str(args.num_designs),
-                "-l", loops,
+                "--output-quiver", str(qv2.resolve()),
+                "-n", "1",
             ]
-            if weights_rf:
-                cmd_rf += ["-w", weights_rf]
-            if hotspots:
-                cmd_rf += ["-h", hotspots]
-            if args.rfdiffusion_extra:
-                for e in args.rfdiffusion_extra:
-                    cmd_rf += ["-e", e]
-            print(f"[{idx}/{len(target_ids)}] {target_id} rfdiffusion...", end=" ", flush=True)
-            ok_rf, t_rf, err_rf = run_cmd_with_timing(cmd_rf, rf_cwd, base_env, "rfdiffusion")
-            if not ok_rf:
+            if weights_pm:
+                cmd_pm += ["-checkpoint_path", weights_pm]
+            print(f"[{row_idx}/{len(targets)}] {task} {target_id} proteinmpnn...", flush=True)
+            ok_pm, t_pm, err_pm = run_cmd_with_timing(cmd_pm, rf_cwd, base_env, "proteinmpnn")
+            if not ok_pm:
                 status = "failed"
-                err_msg = f"rfdiffusion: {err_rf}"
-                print(f"FAILED ({t_rf:.1f}s)")
-                timing_records.append({
+                err_msg = f"proteinmpnn: {err_pm}"
+                print(f"[{row_idx}/{len(targets)}] {task} {target_id} proteinmpnn FAILED ({t_pm:.1f}s)")
+                return {
                     "task": task,
                     "target_id": target_id,
                     "status": status,
                     "rfdiffusion_seconds": round(t_rf, 2),
-                    "proteinmpnn_seconds": 0.0,
+                    "proteinmpnn_seconds": round(t_pm, 2),
                     "qvextract_seconds": 0.0,
-                    "total_seconds": round(t_rf, 2),
+                    "total_seconds": round(t_rf + t_pm, 2),
                     "error": err_msg,
                     "timestamp": datetime.now().isoformat(),
-                })
+                }
+            print(f"[{row_idx}/{len(targets)}] {task} {target_id} proteinmpnn {t_pm:.1f}s")
+            qv_for_extract = qv2
+        else:
+            t_pm = 0.0
+
+        # 3. qvextract (from rfdiffusion.qv or proteinmpnn.qv)
+        extracted_dir.mkdir(parents=True, exist_ok=True)
+        cmd_qv = [args.qvextract_cmd, str(qv_for_extract.resolve()), "-o", str(extracted_dir.resolve())]
+        print(f"[{row_idx}/{len(targets)}] {task} {target_id} qvextract...", flush=True)
+        ok_qv, t_qv, err_qv = run_cmd_with_timing(cmd_qv, rf_cwd, base_env, "qvextract")
+        if not ok_qv:
+            err_msg = f"qvextract: {err_qv}"
+            status_final = "qvextract_failed"
+        else:
+            status_final = status
+        print(
+            f"[{row_idx}/{len(targets)}] {task} {target_id} qvextract {t_qv:.1f}s  "
+            f"total={t_rf + t_pm + t_qv:.1f}s"
+        )
+
+        return {
+            "task": task,
+            "target_id": target_id,
+            "status": status_final,
+            "rfdiffusion_seconds": round(t_rf, 2),
+            "proteinmpnn_seconds": round(t_pm, 2),
+            "qvextract_seconds": round(t_qv, 2),
+            "total_seconds": round(t_rf + t_pm + t_qv, 2),
+            "error": err_msg,
+            "timestamp": datetime.now().isoformat(),
+        }
+
+    for task in tasks:
+        print(f"\n{'='*80}\nTask: {task.upper()}\n{'='*80}\n")
+
+        # 预先过滤好本 task 要跑的 rows
+        task_rows = []
+        for idx, row in enumerate(targets, 1):
+            target_id = row.get("target_id", "").strip() or (list(row.values())[0] if row else "")
+            if not target_id or target_id == "target_id":
                 continue
-            print(f"{t_rf:.1f}s")
+            if selected_target_ids is not None and target_id not in selected_target_ids:
+                continue
+            task_rows.append((idx, row))
 
-            # 2. proteinmpnn (optional; default skip)
-            run_pm = getattr(args, "run_proteinmpnn", False)
-            qv_for_extract = qv1  # default: extract from rfdiffusion output (backbone only)
-            if run_pm:
-                cmd_pm = [
-                    args.proteinmpnn_cmd,
-                    "-q", str(qv1.resolve()),
-                    "--output-quiver", str(qv2.resolve()),
-                    "-n", "1",
-                ]
-                if weights_pm:
-                    cmd_pm += ["-checkpoint_path", weights_pm]
-                print(f"           proteinmpnn...", end=" ", flush=True)
-                ok_pm, t_pm, err_pm = run_cmd_with_timing(cmd_pm, rf_cwd, base_env, "proteinmpnn")
-                if not ok_pm:
-                    status = "failed"
-                    err_msg = f"proteinmpnn: {err_pm}"
-                    print(f"FAILED ({t_pm:.1f}s)")
-                    timing_records.append({
-                        "task": task,
-                        "target_id": target_id,
-                        "status": status,
-                        "rfdiffusion_seconds": round(t_rf, 2),
-                        "proteinmpnn_seconds": round(t_pm, 2),
-                        "qvextract_seconds": 0.0,
-                        "total_seconds": round(t_rf + t_pm, 2),
-                        "error": err_msg,
-                        "timestamp": datetime.now().isoformat(),
-                    })
-                    continue
-                print(f"{t_pm:.1f}s")
-                qv_for_extract = qv2
-            else:
-                t_pm = 0.0
+        if not task_rows:
+            continue
 
-            # 3. qvextract (from rfdiffusion.qv or proteinmpnn.qv)
-            extracted_dir.mkdir(parents=True, exist_ok=True)
-            cmd_qv = [args.qvextract_cmd, str(qv_for_extract.resolve()), "-o", str(extracted_dir.resolve())]
-            print(f"           qvextract...", end=" ", flush=True)
-            ok_qv, t_qv, err_qv = run_cmd_with_timing(cmd_qv, rf_cwd, base_env, "qvextract")
-            if not ok_qv:
-                err_msg = f"qvextract: {err_qv}"
-            print(f"{t_qv:.1f}s  total={t_rf + t_pm + t_qv:.1f}s")
+        max_workers = max(1, int(args.max_concurrent_targets))
+        print(f"{task.upper()}: running {len(task_rows)} targets with up to {max_workers} concurrent targets.")
 
-            timing_records.append({
-                "task": task,
-                "target_id": target_id,
-                "status": status if ok_qv else "qvextract_failed",
-                "rfdiffusion_seconds": round(t_rf, 2),
-                "proteinmpnn_seconds": round(t_pm, 2),
-                "qvextract_seconds": round(t_qv, 2),
-                "total_seconds": round(t_rf + t_pm + t_qv, 2),
-                "error": err_msg,
-                "timestamp": datetime.now().isoformat(),
-            })
+        with ThreadPoolExecutor(max_workers=max_workers) as ex:
+            future_to_idx = {
+                ex.submit(_run_single_target, task, idx, row): idx for idx, row in task_rows
+            }
+            for fut in as_completed(future_to_idx):
+                rec = fut.result()
+                if rec:
+                    _append_timing_row(rec)
 
     total_wall = time.time() - total_wall_start
-
-    # Write timing CSV
-    fieldnames = [
-        "task", "target_id", "status",
-        "rfdiffusion_seconds", "proteinmpnn_seconds", "qvextract_seconds", "total_seconds",
-        "error", "timestamp",
-    ]
-    with open(timing_log, "w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames)
-        w.writeheader()
-        w.writerows(timing_records)
 
     # Summary
     print("\n" + "=" * 80)

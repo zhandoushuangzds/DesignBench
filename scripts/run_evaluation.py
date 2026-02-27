@@ -1,8 +1,8 @@
 """
-Unified evaluation script for benchcore.
+Unified evaluation script for DesignBench.
 
 Assumes standardized input format:
-- Input: Directory containing PDB files (real residues, not Poly-Ala)
+- Input: Directory containing PDB files
 - Metadata: scaffold_info.csv with backbone indices
 - For Motif Scaffolding: Must specify motif residue ranges
 

@@ -115,10 +115,15 @@ class Confidence:
         iptm = summary_confidence['iptm']
         ipae_info = calculate_ipae_info(np.array(confidence['pae']), np.array(confidence['token_chain_ids']))
         ipae, min_ipae = ipae_info['mean_ipae'], ipae_info['min_ipae']
-        # atom_array = pdb.PDBFile.read(pdbpath).get_structure(model=1, extra_fields=['b_factor'])
-        chains_to_design ="B"
-        chains_to_design = str(atom_array.chain_id[atom_array.b_factor != 0][0])
-        ptm_binder = summary_confidence['chain_ptm'][np.unique(atom_array.chain_id).tolist().index(chains_to_design)]
+        pdb_file = pdb.PDBFile.read(pdbpath)
+        atom_array = pdb.get_structure(pdb_file, model=1, extra_fields=['b_factor'])
+        designed = atom_array.b_factor != 0
+        if np.any(designed):
+            chains_to_design = str(atom_array.chain_id[designed][0])
+        else:
+            chains_to_design = str(np.unique(atom_array.chain_id)[0])
+        chain_list = np.unique(atom_array.chain_id).tolist()
+        ptm_binder = summary_confidence['chain_ptm'][chain_list.index(chains_to_design)] if chains_to_design in chain_list else summary_confidence['chain_ptm'][0]
         plddt = sum(confidence['atom_plddts']) / len(confidence['atom_plddts'])
         return plddt, ipae, min_ipae, iptm, ptm_binder
     

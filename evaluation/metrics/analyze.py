@@ -149,13 +149,65 @@ def calc_hydrophobicity(seq: str) -> float:
 # 3. Structure Metrics Calculation (Hydrogen Bonds and Salt Bridges)
 # ==============================================================================
 
-def count_noncovalents(structure_path: str):
+def _count_potential_hbonds_heavy_atom(atom_array, interface_only: bool) -> int:
+    """
+    Count potential H-bonds using heavy-atom donor-acceptor pairs (no H required).
+    Used when structure has no explicit H atoms (e.g. AF3 CIF). Stricter: distance
+    <= 3.0 Å and at least one atom must be side-chain (excludes backbone-backbone).
+    """
+    # Backbone vs side-chain: only count pairs with at least one side-chain (avoids helix/sheet backbone inflation)
+    backbone_names = {'N', 'O'}
+    side_chain_names = {
+        'ND1', 'ND2', 'NE2', 'OE1', 'OD1', 'OD2', 'OG', 'OG1', 'OH',
+        'NE', 'NH1', 'NH2', 'NZ', 'SD', 'SG',
+    }
+    donor_acceptor_names = backbone_names.union(side_chain_names)
+    HBOND_DIST_MAX = 3.0  # Å; typical D..A when H present ~2.5-3.2
+
+    indices = []
+    is_side_chain = []
+    for i, atom in enumerate(atom_array):
+        name = str(atom.atom_name).strip()
+        if name in donor_acceptor_names:
+            indices.append(i)
+            is_side_chain.append(name in side_chain_names)
+    indices = np.array(indices)
+    is_side_chain = np.array(is_side_chain)
+    if len(indices) < 2:
+        return 0
+
+    coords = atom_array.coord[indices]
+    chain_ids = atom_array.chain_id[indices]
+    res_ids = atom_array.res_id[indices]
+    res_keys = [(chain_ids[k], res_ids[k]) for k in range(len(indices))]
+    dists = np.sqrt(((coords[:, None, :] - coords[None, :, :]) ** 2).sum(axis=2))
+    np.fill_diagonal(dists, np.inf)
+
+    unique_pairs = set()
+    for i in range(len(indices)):
+        for j in range(i + 1, len(indices)):
+            if res_keys[i] == res_keys[j]:
+                continue
+            if dists[i, j] > HBOND_DIST_MAX:
+                continue
+            if not (is_side_chain[i] or is_side_chain[j]):
+                continue
+            if interface_only and chain_ids[i] == chain_ids[j]:
+                continue
+            unique_pairs.add(tuple(sorted((res_keys[i], res_keys[j]))))
+    return len(unique_pairs)
+
+
+def count_noncovalents(structure_path: str, interface_only: bool = False):
     """
     Calculate non-covalent interactions: number of hydrogen bonds and salt bridges.
     Supports PDB and CIF formats.
     
     Args:
         structure_path: Path to PDB or CIF file
+        interface_only: If True, count only H-bonds and salt bridges between different
+            chains (e.g. antigen-antibody). Use for PBP/antibody to avoid inflated
+            whole-structure counts.
         
     Returns:
         dict: Dictionary containing 'num_hydrogen_bonds' and 'num_salt_bridges'
@@ -181,65 +233,61 @@ def count_noncovalents(structure_path: str):
         if len(atom_array) == 0:
             return {'num_hydrogen_bonds': 0, 'num_salt_bridges': 0}
         
-        # Use biotite's hydrogen bond detection
+        # Use biotite's hydrogen bond detection (requires explicit H atoms)
         try:
             hbonds = struc.hbond(atom_array)
-            # hbonds is an (N, 3) array, each row is [donor_idx, hydrogen_idx, acceptor_idx]
-            h_bonds_count = len(hbonds)
+            # hbonds is (N, 3): [donor_idx, hydrogen_idx, acceptor_idx]
+            if interface_only and len(hbonds) > 0:
+                donor_idx = hbonds[:, 0]
+                acceptor_idx = hbonds[:, 2]
+                inter_chain = atom_array.chain_id[donor_idx] != atom_array.chain_id[acceptor_idx]
+                h_bonds_count = int(np.sum(inter_chain))
+            else:
+                h_bonds_count = len(hbonds)
         except Exception as e:
-            print(f"Warning: Failed to compute hydrogen bonds for {structure_path}: {e}")
             h_bonds_count = 0
+
+        # Fallback when structure has no H atoms (e.g. AF3 CIF): use heavy-atom donor-acceptor distance
+        # Count N/O pairs from different residues within 3.5 Å (typical D..A distance when H is present)
+        if h_bonds_count == 0:
+            h_bonds_count = _count_potential_hbonds_heavy_atom(atom_array, interface_only)
         
-        # Calculate salt bridges
-        # Get charged residues
+        # Salt bridges: count unique residue pairs (not atom pairs) in 4.0-5.5 Å
         acidic_residues = {'ASP', 'GLU'}
         basic_residues = {'LYS', 'ARG', 'HIS'}
-        
-        # Atoms from acidic residues (negatively charged)
         acidic_atom_names = {'OD1', 'OD2', 'OE1', 'OE2'}
-        # Atoms from basic residues (positively charged)
         basic_atom_names = {'NZ', 'NH1', 'NH2', 'ND1', 'NE2'}
         
-        # Filter relevant atoms
         neg_atoms = []
         pos_atoms = []
-        
         for i, atom in enumerate(atom_array):
             res_name = str(atom.res_name).strip()
             atom_name = str(atom.atom_name).strip()
-            
             if res_name in acidic_residues and atom_name in acidic_atom_names:
                 neg_atoms.append(i)
             elif res_name in basic_residues and atom_name in basic_atom_names:
                 pos_atoms.append(i)
         
-        # Calculate salt bridges (distance threshold 4.0-5.5 Å)
         salt_bridge_count = 0
         if len(neg_atoms) > 0 and len(pos_atoms) > 0:
             neg_coords = atom_array.coord[neg_atoms]
             pos_coords = atom_array.coord[pos_atoms]
-            
-            # Calculate all distances
             distances = np.sqrt(((neg_coords[:, None, :] - pos_coords[None, :, :]) ** 2).sum(axis=2))
-            
-            # Find pairs with distances between 4.0-5.5 Å
             valid_pairs = np.where((distances >= 4.0) & (distances <= 5.5))
-            
-            # Check if from different residues
-            unique_sb_pairs = set()
+            # Unique residue pairs (one count per residue pair, not per atom pair)
+            unique_residue_pairs = set()
             for neg_idx, pos_idx in zip(valid_pairs[0], valid_pairs[1]):
                 neg_atom_idx = neg_atoms[neg_idx]
                 pos_atom_idx = pos_atoms[pos_idx]
-                
-                # Check if from different residues
                 neg_res_id = (atom_array.chain_id[neg_atom_idx], atom_array.res_id[neg_atom_idx])
                 pos_res_id = (atom_array.chain_id[pos_atom_idx], atom_array.res_id[pos_atom_idx])
-                
                 if neg_res_id != pos_res_id:
-                    pair_id = tuple(sorted((neg_atom_idx, pos_atom_idx)))
-                    unique_sb_pairs.add(pair_id)
-            
-            salt_bridge_count = len(unique_sb_pairs)
+                    if interface_only:
+                        if atom_array.chain_id[neg_atom_idx] != atom_array.chain_id[pos_atom_idx]:
+                            unique_residue_pairs.add(tuple(sorted((neg_res_id, pos_res_id))))
+                    else:
+                        unique_residue_pairs.add(tuple(sorted((neg_res_id, pos_res_id))))
+            salt_bridge_count = len(unique_residue_pairs)
         
         return {
             'num_hydrogen_bonds': h_bonds_count,

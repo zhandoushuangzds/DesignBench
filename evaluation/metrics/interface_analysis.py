@@ -774,29 +774,12 @@ class InterfaceAnalyzer:
             'ag_charge': charge_metrics['ag_charge']
         }
         
-        # ========================================================================
-        # 4. Structure Metrics
-        # ========================================================================
-        ss_metrics = self.calculate_epitope_secondary_structure(
-            structure, epitope_residues, ag_chains
-        )
-        num_segments = self.calculate_epitope_segmentation(
-            structure, epitope_residues, ag_chains
-        )
-        
-        structure_metrics = {
-            'epitope_helix_percent': ss_metrics['helix_percent'],
-            'epitope_strand_percent': ss_metrics['strand_percent'],
-            'epitope_coil_percent': ss_metrics['coil_percent'],
-            'epitope_num_segments': num_segments
-        }
-        
-        # Combine all metrics
+        # Combine all metrics (structure-level DSSP metrics are disabled to avoid
+        # external mkdssp/Boost dependencies in typical benchmark environments)
         results = {
             'Geometry': geometry_metrics,
             'Interaction': interaction_metrics,
             'Composition': composition_metrics,
-            'Structure': structure_metrics
         }
         
         return results

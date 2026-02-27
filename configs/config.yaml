@@ -12,6 +12,13 @@ antibody_type: antibody
 cdr_info_csv: null
 target_config_path: null
 max_designs_per_target: 100
+max_targets: null  # optional: set to 1 for quick validation (first target only)
+# Start from step N (1-5). Use start_step=5 to re-run only evaluation + developability.
+start_step: 1
+# Step 5: interface analysis (paratope/epitope, BSA, H-bonds); set false to skip
+enable_interface_analysis: true
+ab_chain_ids: ['B', 'C']   # antibody chains (e.g. H, L in AF3 often B, C)
+ag_chain_ids: ['A']        # antigen chain(s)
 
 hydra:
   run:
