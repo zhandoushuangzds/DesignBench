@@ -2,8 +2,8 @@
 # Path to MotifBench directory
 motifbench_dir: /home/qiantai/zihan/Motif_Benchmark/MotifBench
 
-# Python executable path (for running MotifBench scripts)
-python_path: /DATA/disk0/qtfeng/miniforge3/envs/motif_bench/bin/python
+# Python executable path for subprocesses (null = use current Python, single env suffices)
+python_path: /DATA/disk0/qtfeng/miniforge3/envs/design_benchmark/bin/python
 
 # Foldseek database path (required for novelty calculation)
 foldseek_database: /home/qiantai/zihan/foldseek/databases/pdb

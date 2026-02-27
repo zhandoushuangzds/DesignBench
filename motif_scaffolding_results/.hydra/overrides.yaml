@@ -1,5 +1,0 @@
-- design_dir=/home/qiantai/zihan/Motif_Benchmark/20260206_RFD3_ouputs/rfd3_outputs/01_1LDB
-- motif_scaffolding.motif_list=[01_1LDB]
-- motif_scaffolding.max_samples_per_motif=5
-- model_name=RFD3
-- gpus=7

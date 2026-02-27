@@ -112,7 +112,7 @@ class MotifBenchEvaluator(BaseEvaluator):
         if not script_path.exists():
             raise FileNotFoundError(f"Script not found: {script_path}")
         
-        python_path = self.config.motif_scaffolding.get("python_path", sys.executable)
+        python_path = self.config.motif_scaffolding.get("python_path") or sys.executable
         
         cmd = [
             python_path,
@@ -174,20 +174,30 @@ class MotifBenchEvaluator(BaseEvaluator):
         results = []
         successful_backbones = []
         
-        for idx, row in motif_info_df.iterrows():
+        # Map design_base (backbone stem) -> (motif_info row, backbone path) for lookup
+        design_base_to_row_and_backbone = {}
+        for i in range(min(len(input_backbones), len(motif_info_df))):
+            design_base = Path(input_backbones[i]).stem
+            design_base_to_row_and_backbone[design_base] = (
+                motif_info_df.iloc[i],
+                input_backbones[i]
+            )
+        
+        # Iterate over ALL refold structures (e.g. 5 samples x 8 seqs = 40)
+        for refold_path in sorted(refold_structures):
+            if not refold_path.exists() or refold_path.suffix.lower() != '.pdb':
+                continue
+            stem = refold_path.stem
+            # Parse "01_1LDB_0-1" -> design_base="01_1LDB_0", seq_idx="1"
+            if "-" not in stem:
+                continue
+            design_base, seq_idx = stem.rsplit("-", 1)
+            lookup = design_base_to_row_and_backbone.get(design_base)
+            if lookup is None:
+                continue
+            row, backbone_path = lookup
             sample_num = row['sample_num']
             contig = row.get('contig', '')
-            
-            # Find corresponding refolded structure
-            refold_pdb = None
-            for refold_path in refold_structures:
-                if str(sample_num) in refold_path.name:
-                    refold_pdb = refold_path
-                    break
-            
-            if not refold_pdb or not refold_pdb.exists():
-                self.logger.warning(f"Refolded structure not found for sample {sample_num}")
-                continue
             
             # Calculate motif RMSD
             try:
@@ -212,7 +222,7 @@ class MotifBenchEvaluator(BaseEvaluator):
                 )
                 refold_motif = self.au.motif_extract(
                     sample_contig,
-                    str(refold_pdb),
+                    str(refold_path),
                     atom_part="backbone"
                 )
                 
@@ -220,10 +230,9 @@ class MotifBenchEvaluator(BaseEvaluator):
                 
                 # Calculate scRMSD (self-consistency)
                 from evaluation.metrics.rmsd import RMSDCalculator
-                backbone_path = input_backbones[sample_num] if sample_num < len(input_backbones) else None
-                if backbone_path:
+                if backbone_path and Path(backbone_path).exists():
                     sc_rmsd = RMSDCalculator.compute_protein_ca_rmsd(
-                        pred=str(refold_pdb),
+                        pred=str(refold_path),
                         refold=str(backbone_path)
                     )
                 else:
@@ -234,19 +243,20 @@ class MotifBenchEvaluator(BaseEvaluator):
                 
                 results.append({
                     'sample_num': sample_num,
+                    'seq_idx': seq_idx,
                     'motif_rmsd': motif_rmsd,
                     'sc_rmsd': sc_rmsd,
                     'success': success,
-                    'refold_path': str(refold_pdb)
+                    'refold_path': str(refold_path)
                 })
                 
                 if success:
-                    successful_backbones.append(str(refold_pdb))
+                    successful_backbones.append(str(refold_path))
                     
             except Exception as e:
                 import traceback
                 tb = traceback.format_exc()
-                self.logger.error(f"Error calculating metrics for sample {sample_num}: {e}\n{tb}")
+                self.logger.error(f"Error calculating metrics for {refold_path.name}: {e}\n{tb}")
                 continue
         
         results_df = pd.DataFrame(results)
