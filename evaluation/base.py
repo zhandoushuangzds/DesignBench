@@ -80,6 +80,7 @@ class BaseEvaluator:
         if metadata_file.exists():
             metadata = pd.read_csv(metadata_file)
             self.logger.info(f"Loaded metadata from {metadata_file}")
+            scaffold_info_path = metadata_file
         else:
             # Create minimal metadata from PDB filenames
             self.logger.warning(f"Metadata file not found: {metadata_file}. Creating minimal metadata.")
@@ -87,11 +88,13 @@ class BaseEvaluator:
                 'sample_num': range(len(pdb_files)),
                 'pdb_file': [f.name for f in pdb_files]
             })
+            scaffold_info_path = None
         
         return {
             'pdbs': pdb_files,
             'metadata': metadata,
-            'input_dir': input_dir
+            'input_dir': input_dir,
+            'scaffold_info_path': scaffold_info_path
         }
     
     def run_inverse_folding(
@@ -181,7 +184,9 @@ class BaseEvaluator:
         input_backbones: List[Path],
         refold_structures: List[Path],
         metadata: pd.DataFrame,
-        output_dir: Union[str, Path]
+        output_dir: Union[str, Path],
+        motif_name: Optional[str] = None,
+        scaffold_info_path: Optional[Union[str, Path]] = None
     ) -> pd.DataFrame:
         """
         Calculate evaluation metrics.
@@ -232,7 +237,8 @@ class BaseEvaluator:
         self,
         input_dir: Union[str, Path],
         output_dir: Union[str, Path],
-        metadata_file: Optional[Union[str, Path]] = None
+        metadata_file: Optional[Union[str, Path]] = None,
+        motif_name: Optional[str] = None
     ) -> Dict:
         """
         Run complete evaluation pipeline.
@@ -274,7 +280,9 @@ class BaseEvaluator:
             input_backbones=inputs['pdbs'],
             refold_structures=list((refold_output / "refold_output").glob("*.pdb")),
             metadata=inputs['metadata'],
-            output_dir=output_dir / "metrics"
+            output_dir=output_dir / "metrics",
+            motif_name=motif_name,
+            scaffold_info_path=inputs.get('scaffold_info_path')
         )
         
         return {

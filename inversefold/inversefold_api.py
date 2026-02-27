@@ -176,7 +176,7 @@ class InverseFold:
                     try:
                         fixed_residues = fixed_residues_calculator(pdb_path, cdr_row)
                         fixed_residues_str = " ".join(fixed_residues)
-                        ligandmpnn_multi_input[str(pdb_path.parent / f"{pdb_path.stem.lower()}.pdb")] = fixed_residues_str
+                        ligandmpnn_multi_input[str(pdb_path)] = fixed_residues_str
                         print(f"Fixed {len(fixed_residues)} scaffold residues for {pdb_path.name} (CDR-based)")
                     except Exception as e:
                         print(f"Warning: Failed to calculate CDR-based fixed residues for {pdb_path.name}: {e}")
@@ -185,20 +185,20 @@ class InverseFold:
                         atom_array = pdb.PDBFile.read(pdb_path).get_structure(model=1, extra_fields=['b_factor'])
                         fixed_atom_array = atom_array[atom_array.b_factor != 0.0]
                         fixed_residues = np.unique(np.char.add(fixed_atom_array.chain_id, np.array(fixed_atom_array.res_id, dtype=str)))
-                        ligandmpnn_multi_input[str(pdb_path.parent / f"{pdb_path.stem.lower()}.pdb")] = " ".join(fixed_residues.tolist())
+                        ligandmpnn_multi_input[str(pdb_path)] = " ".join(fixed_residues.tolist())
                 else:
                     print(f"Warning: No CDR info found for {pdb_path.name}, using b_factor method")
                     # Fall back to b_factor method
                     atom_array = pdb.PDBFile.read(pdb_path).get_structure(model=1, extra_fields=['b_factor'])
                     fixed_atom_array = atom_array[atom_array.b_factor != 0.0]
                     fixed_residues = np.unique(np.char.add(fixed_atom_array.chain_id, np.array(fixed_atom_array.res_id, dtype=str)))
-                    ligandmpnn_multi_input[str(pdb_path.parent / f"{pdb_path.stem.lower()}.pdb")] = " ".join(fixed_residues.tolist())
+                    ligandmpnn_multi_input[str(pdb_path)] = " ".join(fixed_residues.tolist())
             else:
                 # Original method: use b_factor
                 atom_array = pdb.PDBFile.read(pdb_path).get_structure(model=1, extra_fields=['b_factor'])
                 fixed_atom_array = atom_array[atom_array.b_factor != 0.0]
                 fixed_residues = np.unique(np.char.add(fixed_atom_array.chain_id, np.array(fixed_atom_array.res_id, dtype=str)))
-                ligandmpnn_multi_input[str(pdb_path.parent / f"{pdb_path.stem.lower()}.pdb")] = " ".join(fixed_residues.tolist())
+                ligandmpnn_multi_input[str(pdb_path)] = " ".join(fixed_residues.tolist())
         
         json.dump(ligandmpnn_multi_input, open(os.path.join(output_dir, "ligandmpnn_input.json"), 'w'), indent=4)
 
@@ -287,7 +287,7 @@ class InverseFold:
             atom_array = pdb.PDBFile.read(pdb_path).get_structure(model=1, extra_fields=['b_factor'])
             fixed_atom_array = atom_array[atom_array.b_factor != 0.0]
             fixed_residues = np.unique(np.char.add(fixed_atom_array.chain_id, np.array(fixed_atom_array.res_id, dtype=str)))
-            ligandmpnn_multi_input[str(pdb_path.parent / f"{pdb_path.stem.lower()}.pdb")] = " ".join(fixed_residues.tolist())
+            ligandmpnn_multi_input[str(pdb_path)] = " ".join(fixed_residues.tolist())
         json.dump(ligandmpnn_multi_input, open(os.path.join(output_dir, "ligandmpnn_input.json"), 'w'), indent=4)
 
         num_gpus = len(gpu_list)

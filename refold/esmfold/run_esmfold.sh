@@ -147,8 +147,8 @@ fi
 # Create output directory if it doesn't exist
 mkdir -p "$OUTPUT_DIR"
 
-# Build torchrun command
-TORCHRUN_CMD="torchrun"
+# Build torchrun command (use python -m to avoid bad shebang in torchrun script)
+TORCHRUN_CMD="${PYTHON:-python} -m torch.distributed.run"
 TORCHRUN_CMD+=" --nproc_per_node=$NUM_GPUS"
 TORCHRUN_CMD+=" --nnodes=1"
 TORCHRUN_CMD+=" --node_rank=0"

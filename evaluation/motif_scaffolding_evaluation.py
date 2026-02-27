@@ -149,6 +149,7 @@ class MotifScaffoldingEvaluation:
                 input_dir=input_dir,
                 output_dir=out_dir,
                 metadata_file=metadata_file if metadata_file.exists() else None,
+                motif_name=motif_name,
             )
             results[motif_name] = out_dir
 

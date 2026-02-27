@@ -1,21 +1,84 @@
-[2026-02-27 12:13:20,447][MDAnalysis.coordinates.AMBER][WARNING] - netCDF4 is not available. Writing AMBER ncdf files will be slow.
-[2026-02-27 12:13:20,716][MotifBenchEvaluator][INFO] - Step 1: Loading inputs...
-[2026-02-27 12:13:20,716][MotifBenchEvaluator][INFO] - Found 5 PDB files in /home/qiantai/zihan/benchcore/results/motif_scaffolding/01_1LDB_input
-[2026-02-27 12:13:20,717][MotifBenchEvaluator][INFO] - Loaded metadata from /home/qiantai/zihan/benchcore/results/motif_scaffolding/01_1LDB_input/scaffold_info.csv
-[2026-02-27 12:13:20,717][MotifBenchEvaluator][INFO] - Step 2: Running inverse folding...
-[2026-02-27 12:13:23,155][MotifBenchEvaluator][INFO] - Inverse folding completed. Output: /home/qiantai/zihan/benchcore/results/motif_scaffolding/01_1LDB/inverse_fold
-[2026-02-27 12:13:23,155][MotifBenchEvaluator][INFO] - Step 3: Running refolding...
-[2026-02-27 12:14:04,939][MDAnalysis.coordinates.AMBER][WARNING] - netCDF4 is not available. Writing AMBER ncdf files will be slow.
-[2026-02-27 12:14:05,241][MotifBenchEvaluator][INFO] - Step 1: Loading inputs...
-[2026-02-27 12:14:05,241][MotifBenchEvaluator][INFO] - Found 5 PDB files in /home/qiantai/zihan/benchcore/results/motif_scaffolding/01_1LDB_input
-[2026-02-27 12:14:05,241][MotifBenchEvaluator][INFO] - Loaded metadata from /home/qiantai/zihan/benchcore/results/motif_scaffolding/01_1LDB_input/scaffold_info.csv
-[2026-02-27 12:14:05,242][MotifBenchEvaluator][INFO] - Step 2: Running inverse folding...
-[2026-02-27 12:14:08,808][MotifBenchEvaluator][INFO] - Inverse folding completed. Output: /home/qiantai/zihan/benchcore/results/motif_scaffolding/01_1LDB/inverse_fold
-[2026-02-27 12:14:08,808][MotifBenchEvaluator][INFO] - Step 3: Running refolding...
-[2026-02-27 12:22:44,835][MDAnalysis.coordinates.AMBER][WARNING] - netCDF4 is not available. Writing AMBER ncdf files will be slow.
-[2026-02-27 12:22:45,126][MotifBenchEvaluator][INFO] - Step 1: Loading inputs...
-[2026-02-27 12:22:45,127][MotifBenchEvaluator][INFO] - Found 5 PDB files in /home/qiantai/zihan/benchcore/results/motif_scaffolding/01_1LDB_input
-[2026-02-27 12:22:45,127][MotifBenchEvaluator][INFO] - Loaded metadata from /home/qiantai/zihan/benchcore/results/motif_scaffolding/01_1LDB_input/scaffold_info.csv
-[2026-02-27 12:22:45,127][MotifBenchEvaluator][INFO] - Step 2: Running inverse folding...
-[2026-02-27 12:22:49,096][MotifBenchEvaluator][INFO] - Inverse folding completed. Output: /home/qiantai/zihan/benchcore/results/motif_scaffolding/01_1LDB/inverse_fold
-[2026-02-27 12:22:49,096][MotifBenchEvaluator][INFO] - Step 3: Running refolding...
+[2026-02-27 13:49:35,042][MDAnalysis.coordinates.AMBER][WARNING] - netCDF4 is not available. Writing AMBER ncdf files will be slow.
+[2026-02-27 13:49:35,432][MotifBenchEvaluator][INFO] - Step 1: Loading inputs...
+[2026-02-27 13:49:35,433][MotifBenchEvaluator][INFO] - Found 5 PDB files in /home/qiantai/zihan/benchcore/results/motif_scaffolding/01_1LDB_input
+[2026-02-27 13:49:35,434][MotifBenchEvaluator][INFO] - Loaded metadata from /home/qiantai/zihan/benchcore/results/motif_scaffolding/01_1LDB_input/scaffold_info.csv
+[2026-02-27 13:49:35,434][MotifBenchEvaluator][INFO] - Step 2: Running inverse folding...
+[2026-02-27 13:49:44,613][MotifBenchEvaluator][INFO] - Inverse folding completed. Output: /home/qiantai/zihan/benchcore/results/motif_scaffolding/01_1LDB/inverse_fold
+[2026-02-27 13:49:44,613][MotifBenchEvaluator][INFO] - Step 3: Running refolding...
+[2026-02-27 13:50:29,286][MotifBenchEvaluator][INFO] - Refolding completed. Output: /home/qiantai/zihan/benchcore/results/motif_scaffolding/01_1LDB/refold/refold_output
+[2026-02-27 13:50:29,286][MotifBenchEvaluator][INFO] - Step 4: Calculating metrics...
+[2026-02-27 13:50:29,292][MotifBenchEvaluator][ERROR] - Error calculating metrics for sample 0: ''
+[2026-02-27 13:50:29,295][MotifBenchEvaluator][ERROR] - Error calculating metrics for sample 1: ''
+[2026-02-27 13:50:29,297][MotifBenchEvaluator][ERROR] - Error calculating metrics for sample 2: ''
+[2026-02-27 13:50:29,299][MotifBenchEvaluator][ERROR] - Error calculating metrics for sample 3: ''
+[2026-02-27 13:50:29,301][MotifBenchEvaluator][ERROR] - Error calculating metrics for sample 4: ''
+[2026-02-27 13:54:45,919][MDAnalysis.coordinates.AMBER][WARNING] - netCDF4 is not available. Writing AMBER ncdf files will be slow.
+[2026-02-27 13:54:46,224][MotifBenchEvaluator][INFO] - Step 1: Loading inputs...
+[2026-02-27 13:54:46,224][MotifBenchEvaluator][INFO] - Found 5 PDB files in /home/qiantai/zihan/benchcore/results/motif_scaffolding/01_1LDB_input
+[2026-02-27 13:54:46,225][MotifBenchEvaluator][INFO] - Loaded metadata from /home/qiantai/zihan/benchcore/results/motif_scaffolding/01_1LDB_input/scaffold_info.csv
+[2026-02-27 13:54:46,225][MotifBenchEvaluator][INFO] - Step 2: Running inverse folding...
+[2026-02-27 13:54:52,901][MotifBenchEvaluator][INFO] - Inverse folding completed. Output: /home/qiantai/zihan/benchcore/results/motif_scaffolding/01_1LDB/inverse_fold
+[2026-02-27 13:54:52,902][MotifBenchEvaluator][INFO] - Step 3: Running refolding...
+[2026-02-27 13:55:41,991][MotifBenchEvaluator][INFO] - Refolding completed. Output: /home/qiantai/zihan/benchcore/results/motif_scaffolding/01_1LDB/refold/refold_output
+[2026-02-27 13:55:41,991][MotifBenchEvaluator][INFO] - Step 4: Calculating metrics...
+[2026-02-27 13:55:41,992][MotifBenchEvaluator][INFO] - Generating motif_info.csv for 01_1LDB
+[2026-02-27 13:55:42,025][MotifBenchEvaluator][ERROR] - Error calculating metrics for sample 0: can only concatenate tuple (not "int") to tuple
+Traceback (most recent call last):
+  File "/home/qiantai/zihan/benchcore/evaluation/motif_bench.py", line 200, in calculate_metrics
+    sample_contig = self.au.motif_indices_to_contig(motif_indices)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/qiantai/zihan/Motif_Benchmark/MotifBench/Scaffold-Lab/analysis/utils.py", line 485, in motif_indices_to_contig
+    if i == len(sorted_indices) - 1 or sorted_indices[i + 1] != index + 1:
+                                                                ~~~~~~^~~
+TypeError: can only concatenate tuple (not "int") to tuple
+
+[2026-02-27 13:55:42,028][MotifBenchEvaluator][ERROR] - Error calculating metrics for sample 1: can only concatenate tuple (not "int") to tuple
+Traceback (most recent call last):
+  File "/home/qiantai/zihan/benchcore/evaluation/motif_bench.py", line 200, in calculate_metrics
+    sample_contig = self.au.motif_indices_to_contig(motif_indices)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/qiantai/zihan/Motif_Benchmark/MotifBench/Scaffold-Lab/analysis/utils.py", line 485, in motif_indices_to_contig
+    if i == len(sorted_indices) - 1 or sorted_indices[i + 1] != index + 1:
+                                                                ~~~~~~^~~
+TypeError: can only concatenate tuple (not "int") to tuple
+
+[2026-02-27 13:55:42,030][MotifBenchEvaluator][ERROR] - Error calculating metrics for sample 2: can only concatenate tuple (not "int") to tuple
+Traceback (most recent call last):
+  File "/home/qiantai/zihan/benchcore/evaluation/motif_bench.py", line 200, in calculate_metrics
+    sample_contig = self.au.motif_indices_to_contig(motif_indices)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/qiantai/zihan/Motif_Benchmark/MotifBench/Scaffold-Lab/analysis/utils.py", line 485, in motif_indices_to_contig
+    if i == len(sorted_indices) - 1 or sorted_indices[i + 1] != index + 1:
+                                                                ~~~~~~^~~
+TypeError: can only concatenate tuple (not "int") to tuple
+
+[2026-02-27 13:55:42,033][MotifBenchEvaluator][ERROR] - Error calculating metrics for sample 3: can only concatenate tuple (not "int") to tuple
+Traceback (most recent call last):
+  File "/home/qiantai/zihan/benchcore/evaluation/motif_bench.py", line 200, in calculate_metrics
+    sample_contig = self.au.motif_indices_to_contig(motif_indices)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/qiantai/zihan/Motif_Benchmark/MotifBench/Scaffold-Lab/analysis/utils.py", line 485, in motif_indices_to_contig
+    if i == len(sorted_indices) - 1 or sorted_indices[i + 1] != index + 1:
+                                                                ~~~~~~^~~
+TypeError: can only concatenate tuple (not "int") to tuple
+
+[2026-02-27 13:55:42,036][MotifBenchEvaluator][ERROR] - Error calculating metrics for sample 4: can only concatenate tuple (not "int") to tuple
+Traceback (most recent call last):
+  File "/home/qiantai/zihan/benchcore/evaluation/motif_bench.py", line 200, in calculate_metrics
+    sample_contig = self.au.motif_indices_to_contig(motif_indices)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/qiantai/zihan/Motif_Benchmark/MotifBench/Scaffold-Lab/analysis/utils.py", line 485, in motif_indices_to_contig
+    if i == len(sorted_indices) - 1 or sorted_indices[i + 1] != index + 1:
+                                                                ~~~~~~^~~
+TypeError: can only concatenate tuple (not "int") to tuple
+
+[2026-02-27 13:58:00,107][MDAnalysis.coordinates.AMBER][WARNING] - netCDF4 is not available. Writing AMBER ncdf files will be slow.
+[2026-02-27 13:58:00,402][MotifBenchEvaluator][INFO] - Step 1: Loading inputs...
+[2026-02-27 13:58:00,402][MotifBenchEvaluator][INFO] - Found 5 PDB files in /home/qiantai/zihan/benchcore/results/motif_scaffolding/01_1LDB_input
+[2026-02-27 13:58:00,403][MotifBenchEvaluator][INFO] - Loaded metadata from /home/qiantai/zihan/benchcore/results/motif_scaffolding/01_1LDB_input/scaffold_info.csv
+[2026-02-27 13:58:00,403][MotifBenchEvaluator][INFO] - Step 2: Running inverse folding...
+[2026-02-27 13:58:07,783][MotifBenchEvaluator][INFO] - Inverse folding completed. Output: /home/qiantai/zihan/benchcore/results/motif_scaffolding/01_1LDB/inverse_fold
+[2026-02-27 13:58:07,783][MotifBenchEvaluator][INFO] - Step 3: Running refolding...
+[2026-02-27 13:58:57,455][MotifBenchEvaluator][INFO] - Refolding completed. Output: /home/qiantai/zihan/benchcore/results/motif_scaffolding/01_1LDB/refold/refold_output
+[2026-02-27 13:58:57,455][MotifBenchEvaluator][INFO] - Step 4: Calculating metrics...
+[2026-02-27 13:58:57,455][MotifBenchEvaluator][INFO] - Generating motif_info.csv for 01_1LDB

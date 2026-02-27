@@ -14,7 +14,7 @@ inversefold:
   exec: inversefold/LigandMPNN/run.py
   model_type: protein_mpnn
   checkpoint_path: ${oc.env:PROTEINMPNN_CHECKPOINT_PATH,/nfs_share/qtfeng/design/ref/LigandMPNN/model_params/proteinmpnn_v_48_020.pt}
-  batch_size: 4
+  batch_size: 8
   number_of_batches: 1
   temperature: 0.1
   seed: 0

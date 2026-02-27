@@ -136,7 +136,8 @@ class MotifBenchEvaluator(BaseEvaluator):
         refold_structures: List[Path],
         metadata: pd.DataFrame,
         output_dir: Union[str, Path],
-        motif_name: Optional[str] = None
+        motif_name: Optional[str] = None,
+        scaffold_info_path: Optional[Union[str, Path]] = None
     ) -> pd.DataFrame:
         """
         Calculate motif-specific metrics: scRMSD, motifRMSD, Novelty, Diversity.
@@ -152,15 +153,16 @@ class MotifBenchEvaluator(BaseEvaluator):
         
         # Get motif_name from metadata or use default
         if motif_name is None:
-            motif_name = metadata.get('motif_name', 'default_motif').iloc[0] if len(metadata) > 0 else 'default_motif'
+            col = metadata.get('motif_name', None)
+            motif_name = col.iloc[0] if hasattr(col, 'iloc') and len(metadata) > 0 else 'default_motif'
         
         motif_pdb_path = self.motif_pdbs_dir / f"{motif_name}.pdb"
         if not motif_pdb_path.exists():
             raise FileNotFoundError(f"Motif PDB not found: {motif_pdb_path}")
         
-        # Generate motif_info.csv
-        scaffold_info_path = metadata.get('scaffold_info_path', None)
-        if scaffold_info_path:
+        # Generate motif_info.csv from scaffold_info.csv (MotifBench format)
+        scaffold_info_path = scaffold_info_path or metadata.get('scaffold_info_path', None)
+        if scaffold_info_path and Path(scaffold_info_path).exists():
             motif_info_path = self.generate_motif_info(
                 scaffold_info_path, motif_name, output_dir
             )
@@ -193,9 +195,15 @@ class MotifBenchEvaluator(BaseEvaluator):
                     str(motif_pdb_path),
                     row.get('segment_order', '')
                 )
-                
-                motif_indices = self.au.parse_contig(contig)
-                sample_contig = self.au.motif_indices_to_contig(motif_indices)
+                # Build motif-only contig for refolded structure (motif_extract expects
+                # contig string like "A1-7/A28-79", not parse_contig output)
+                contig_segments = self.au.parse_contig(contig)
+                motif_parts = []
+                for seg in contig_segments:
+                    if seg[0] != "scaffold":
+                        chain, start, end = seg
+                        motif_parts.append(f"{chain}{start}-{end}" if start != end else f"{chain}{start}")
+                sample_contig = "/".join(motif_parts) if motif_parts else contig
                 
                 ref_motif = self.au.motif_extract(
                     reference_contig,
@@ -236,7 +244,9 @@ class MotifBenchEvaluator(BaseEvaluator):
                     successful_backbones.append(str(refold_pdb))
                     
             except Exception as e:
-                self.logger.error(f"Error calculating metrics for sample {sample_num}: {e}")
+                import traceback
+                tb = traceback.format_exc()
+                self.logger.error(f"Error calculating metrics for sample {sample_num}: {e}\n{tb}")
                 continue
         
         results_df = pd.DataFrame(results)
