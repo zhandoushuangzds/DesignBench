@@ -102,7 +102,6 @@ def main(args) -> None:
     # loop over PDB paths
     for pdb in pdb_paths:
         if args.verbose:
-            print("Designing protein from this path:", pdb)
         fixed_residues = fixed_residues_multi[pdb]
         redesigned_residues = redesigned_residues_multi[pdb]
         protein_dict, backbone, other_atoms, icodes, _ = parse_PDB(
@@ -193,8 +192,6 @@ def main(args) -> None:
                 for item in range(protein_dict["chain_mask"].shape[0])
                 if protein_dict["chain_mask"][item] == 0
             ]
-            print("These residues will be redesigned: ", PDB_residues_to_be_redesigned)
-            print("These residues will be fixed: ", PDB_residues_to_be_fixed)
 
         # specify which residues are linked
         if args.symmetry_residues:

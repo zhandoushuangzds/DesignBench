@@ -5,6 +5,8 @@ import subprocess
 import numpy as np
 from pathlib import Path
 import biotite.structure as struc
+from biotite.structure import BadStructureError
+from biotite.structure import info as struc_info
 import concurrent.futures
 from biotite.structure.io import pdb, pdbx  
 from preprocess.ccd_parser import LocalCcdParser
@@ -85,10 +87,17 @@ def get_nucleic_acid_sequence(chain_struct):
         return sequence if sequence else None
 
 def _gpus_to_str(gpus) -> str:
-    """Normalize gpus config to comma-separated string (supports list or string)."""
+    """Normalize gpus to comma-separated string (e.g. '5,6,7'). Handles list, string '5,6,7', or \"['5','6','7']\"."""
+    def _clean(x):
+        return str(x).strip().strip("[]'\"")
     if isinstance(gpus, (list, tuple)):
-        return ",".join(str(x).strip() for x in gpus)
-    return str(gpus).strip()
+        return ",".join(_clean(x) for x in gpus)
+    s = str(gpus).strip()
+    if s.startswith("["):
+        import re
+        s = re.sub(r"[\s\[\]'\"]", "", s)
+    parts = [x.strip().strip("[]'\"") for x in s.split(",") if x.strip()]
+    return ",".join(parts) if parts else _clean(s)
 
 
 class ReFold:
@@ -327,7 +336,20 @@ class ReFold:
                     s["rna"]["unpairedMsa"] = ""
                 single_input["sequences"].append(s)
             else:
-                sequence = str(struc.to_sequence(chain_atom_array, allow_hetero=True)[0][0])
+                try:
+                    sequence = str(struc.to_sequence(chain_atom_array, allow_hetero=True)[0][0])
+                except BadStructureError:
+                    # Replace non-standard residue names (e.g. UNK from LigandMPNN) so biotite can parse
+                    standard_aa = set(struc_info.amino_acid_names())
+                    res_names = chain_atom_array.res_name.copy()
+                    non_std = ~np.isin(res_names, list(standard_aa))
+                    if non_std.any():
+                        res_names[non_std] = "GLY"
+                        chain_copy = chain_atom_array.copy()
+                        chain_copy.res_name = res_names
+                        sequence = str(struc.to_sequence(chain_copy, allow_hetero=True)[0][0])
+                    else:
+                        raise
                 s = {
                     "protein": {
                         "sequence": sequence,

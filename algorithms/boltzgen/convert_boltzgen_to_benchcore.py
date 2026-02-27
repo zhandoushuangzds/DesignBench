@@ -58,42 +58,67 @@ def _parse_atom_site_columns(cif_path: Path):
 
 
 def get_chain_ids_from_cif(cif_path: Path) -> list:
-    """Return ordered list of chain IDs in the CIF. First = H, second = L (if antibody)."""
-    chain_counts = get_chain_residue_counts_from_cif(cif_path)
-    return [c for c, _ in chain_counts]
+    """Return chain IDs in BoltzGen structure order (first appearance in atom_site)."""
+    _, order = _get_chain_residues_and_order_from_cif(cif_path)
+    return order
 
 
-def get_chain_residue_counts_from_cif(cif_path: Path):
+def get_chains_in_structure_order(cif_path: Path) -> list:
+    """
+    Return chain IDs in BoltzGen structure order: first appearance in atom_site.
+    BoltzGen output: antigen chains first, then scaffold H, then L (antibody) or H only (nanobody).
+    """
+    _, order = _get_chain_residues_and_order_from_cif(cif_path)
+    return order
+
+
+def _get_chain_residues_and_order_from_cif(cif_path: Path) -> tuple[dict, list]:
+    """
+    Parse CIF atom_site, return (chain_residues, chain_order).
+    chain_order = first appearance order (BoltzGen: antigen, then H, then L).
+    """
     idx_map = _parse_atom_site_columns(cif_path)
     idx_asym = idx_map.get("label_asym_id", idx_map.get("auth_asym_id", 6))
     idx_seq = idx_map.get("auth_seq_id", idx_map.get("label_seq_id", 16))
     idx_label_seq = idx_map.get("label_seq_id", 8)
     max_idx = max(idx_asym, idx_seq, idx_label_seq)
-    past_atom_site_header = False
     chain_residues = {}
+    chain_order = []
+    past_atom_site_header = False
     with open(cif_path) as f:
         for line in f:
             line = line.strip()
+            if line == "loop_" or line.startswith("data_"):
+                past_atom_site_header = False
+                continue
             if line.startswith("_atom_site."):
                 past_atom_site_header = True
                 continue
             if not past_atom_site_header:
                 continue
-            if line.startswith("#") or (line.startswith("_") and not line.startswith("_atom_site")) or line == "loop_":
+            if line.startswith("#") or (line.startswith("_") and not line.startswith("_atom_site")):
                 continue
             parts = line.split()
             if len(parts) <= max_idx:
                 continue
             asym = parts[idx_asym]
+            if not asym or (len(asym) <= 2 and asym.replace(".", "").replace("-", "").isdigit()):
+                continue
+            if asym not in chain_residues:
+                chain_residues[asym] = set()
+                chain_order.append(asym)
             try:
                 seq_val = parts[idx_seq]
                 seq_id = int(seq_val) if seq_val not in ("?", ".") else int(parts[idx_label_seq])
             except (ValueError, IndexError):
                 continue
-            if asym not in chain_residues:
-                chain_residues[asym] = set()
             chain_residues[asym].add(seq_id)
-    chain_order = sorted(chain_residues.keys())
+    return chain_residues, chain_order
+
+
+def get_chain_residue_counts_from_cif(cif_path: Path):
+    """Return [(chain_id, residue_count), ...] in structure order (BoltzGen: antigen, H, L)."""
+    chain_residues, chain_order = _get_chain_residues_and_order_from_cif(cif_path)
     return [(c, len(chain_residues[c])) for c in chain_order]
 
 
@@ -411,11 +436,22 @@ def main():
         print(f"Copied {len(cif_files)} designs for {target_id} -> {design_dir}")
 
         # One CDR row per design (BenchCore: id = 01_7UXQ_0, 01_7UXQ_1, ...)
+        # BoltzGen output order: antigen chains first, then scaffold H, then L (antibody) or H only (nanobody)
         for i, cif_path in enumerate(cif_files):
             design_id = f"{target_id}_{i}"
-            chain_ids = get_chain_ids_from_cif(cif_path)
-            h_chain = chain_ids[0] if len(chain_ids) >= 1 else "A"
-            l_chain = chain_ids[1] if args.task == "antibody" and len(chain_ids) >= 2 else ""
+            chains_order = get_chains_in_structure_order(cif_path)
+            if args.task == "antibody":
+                if len(chains_order) >= 2:
+                    # Last two in structure order = H, L (BoltzGen scaffold: H first, L second)
+                    h_chain = chains_order[-2]
+                    l_chain = chains_order[-1]
+                else:
+                    h_chain = chains_order[-1] if chains_order else "A"
+                    l_chain = ""
+            else:
+                # Nanobody: last chain in structure = H
+                h_chain = chains_order[-1] if chains_order else "A"
+                l_chain = ""
             if args.task == "antibody":
                 npz_path = interm / f"{cif_path.stem}.npz"
                 cdr = get_antibody_cdr_row(cif_path, npz_path)

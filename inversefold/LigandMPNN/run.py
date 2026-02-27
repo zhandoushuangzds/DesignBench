@@ -191,7 +191,7 @@ def main(args) -> None:
     # loop over PDB paths
     for pdb in pdb_paths:
         if args.verbose:
-            print("Designing protein from this path:", pdb)
+            pass  # verbose output removed
         fixed_residues = fixed_residues_multi[pdb]
         redesigned_residues = redesigned_residues_multi[pdb]
         parse_all_atoms_flag = args.ligand_mpnn_use_side_chain_context or (
@@ -312,8 +312,6 @@ def main(args) -> None:
                 for item in range(protein_dict["chain_mask"].shape[0])
                 if protein_dict["chain_mask"][item] == 0
             ]
-            print("These residues will be redesigned: ", PDB_residues_to_be_redesigned)
-            print("These residues will be fixed: ", PDB_residues_to_be_fixed)
 
         # specify which residues are linked
         if args.symmetry_residues:
@@ -578,16 +576,15 @@ def main(args) -> None:
                     )
 
                     # write new sequences into PDB with backbone coordinates
-                    seq_prody = np.array([restype_1to3[AA] for AA in list(seq)])[
-                        None,
-                    ].repeat(4, 1)
+                    n_backbone_atoms = len(backbone)
+                    seq_prody = np.array([restype_1to3[AA] for AA in list(seq)])
+                    seq_prody = np.repeat(seq_prody, 4)[:n_backbone_atoms]
                     bfactor_prody = (
-                        loss_per_residue_stack[ix].cpu().numpy()[None, :].repeat(4, 1)
+                        loss_per_residue_stack[ix].cpu().numpy().repeat(4)[:n_backbone_atoms]
                     )
                     backbone.setResnames(seq_prody)
                     backbone.setBetas(
-                        np.exp(-bfactor_prody)
-                        * (bfactor_prody > 0.01).astype(np.float32)
+                        np.exp(-bfactor_prody) * (bfactor_prody > 0.01).astype(np.float32)
                     )
                     if other_atoms:
                         writePDB(

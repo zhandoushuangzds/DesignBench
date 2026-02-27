@@ -23,11 +23,17 @@ from evaluation.antibody import AntibodyDesignModule, NanobodyDesignModule
 
 
 def _gpus_to_list(cfg):
-    """Normalize gpus config to a list of GPU id strings (supports list or comma-separated string)."""
+    """Normalize gpus config to a list of GPU id strings (supports list or string '5,6,7' or \"['5','6','7']\"). Strips [ ] and quotes from each element."""
+    def _clean(s):
+        return str(s).strip().strip("[]'\"")
     g = cfg.gpus
     if isinstance(g, (list, tuple)):
-        return [str(x).strip() for x in g]
-    return [x.strip() for x in str(g).split(",") if x.strip()]
+        return [_clean(x) for x in g]
+    s = str(g).strip()
+    if s.startswith("[") and s.endswith("]"):
+        import re
+        s = re.sub(r"[\s\[\]]", "", s)
+    return [_clean(x) for x in s.split(",") if x.strip()]
 
 
 @hydra.main(config_path="../configs", config_name="config")
@@ -36,6 +42,7 @@ def main(cfg: DictConfig):
     Main pipeline function with strict input auditing.
     """
     gpu_list = _gpus_to_list(cfg)
+    cfg.gpus = gpu_list  # overwrite so refold/inversefold get clean list
     os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(gpu_list)
 
     # Initialize directories

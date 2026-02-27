@@ -1,6 +1,8 @@
 name: alphafold3
-af3_exec: /nfs_share/qtfeng/fold/ref/af3_data/af3/run_af3_5880.sh
-run_data_pipeline: true
+# AF3 run script (override at runtime: refold.af3_exec=/path/to/run_af3.sh)
+af3_exec: /home/nvme04/qtfeng/design/design/ref/af3_data/af3/run_af3_a800.sh
+# false = no MSA search (faster). true = full data pipeline
+run_data_pipeline: false
 exp_name: test
 num_workers: 8
 cache_dir: 
