@@ -107,9 +107,22 @@ class ReFold:
         self.config = config
 
     def run_alphafold3(self, input_json: str, output_dir: str):
+        output_dir = str(Path(output_dir).resolve())
+        input_json = str(Path(input_json).resolve())
         gpus_str = _gpus_to_str(self.config.gpus)
         cmd = ["bash", f"{self.config.refold.af3_exec}", f"{self.config.refold.exp_name}", f"{input_json}", f"{output_dir}", gpus_str, f"{self.config.refold.run_data_pipeline}", f"{self.config.refold.cache_dir}"]
         subprocess.run(cmd, check=True)
+        # Verify output was produced
+        cif_files = list(Path(output_dir).rglob("*.cif"))
+        if not cif_files:
+            log_dir = Path(output_dir).parent / "af3_log"
+            log_hint = f" Check {log_dir}/ for AF3 GPU logs." if log_dir.exists() else ""
+            raise FileNotFoundError(
+                f"AF3 completed but no CIF files in {output_dir}.{log_hint} "
+                "Possible causes: (1) Container writes to a different path; "
+                "(2) AF3 failed - check af3_log/*.log; "
+                "(3) templatesPath in af3_input.json - ensure backbone PDB paths are accessible inside container."
+            )
     
     def run_chai1(self, fasta_list: list, output_dir: str):
         
@@ -365,12 +378,8 @@ class ReFold:
                         s["protein"]["pairedMsaPath"] = paired_msa_cache[sequence]
                     else:
                         s["protein"]["pairedMsa"] = ""
-                    if use_backbone_as_template:
-                        s["protein"]["templatesPath"] = str(backbone_path.resolve())
-                    elif template_cache and sequence in template_cache:
-                        s["protein"]["templatesPath"] = template_cache[sequence]
-                    else:
-                        s["protein"]["templates"] = []
+                    # Note: AF3 container rejects templatesPath - use templates: [] (no custom template)
+                    s["protein"]["templates"] = []
                 single_input["sequences"].append(s)
         return single_input
     

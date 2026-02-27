@@ -202,7 +202,6 @@ class InverseFold:
                         fixed_residues = fixed_residues_calculator(struct_path, cdr_row)
                         fixed_residues_str = " ".join(fixed_residues)
                         ligandmpnn_multi_input[pdb_key] = fixed_residues_str
-                        print(f"Fixed {len(fixed_residues)} scaffold residues for {struct_path.name} (CDR-based)")
                     except Exception as e:
                         print(f"Warning: Failed to calculate CDR-based fixed residues for {struct_path.name}: {e}")
                         print(f"  Falling back to b_factor-based method")
@@ -224,6 +223,8 @@ class InverseFold:
         
         json.dump(ligandmpnn_multi_input, open(os.path.join(output_dir, "ligandmpnn_input.json"), 'w'), indent=4)
 
+        if use_cdr_fix and cdr_df is not None:
+            print(f"Prepared fixed residues for {len(ligandmpnn_multi_input)} structures (CDR-based)")
         num_gpus = len(gpu_list)
         all_items_list = list(ligandmpnn_multi_input.items())
         data_batches = np.array_split(all_items_list, num_gpus)

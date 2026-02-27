@@ -376,13 +376,10 @@ def main(args) -> None:
                     atom_mask = list(protein_dict["Y_m"].cpu().numpy())
                     number_of_atoms_parsed = np.sum(atom_mask)
                 else:
-                    print("No ligand atoms parsed")
                     number_of_atoms_parsed = 0
                     atom_types = ""
                     atom_coords = []
-                if number_of_atoms_parsed == 0:
-                    print("No ligand atoms parsed")
-                elif args.model_type == "ligand_mpnn":
+                if number_of_atoms_parsed > 0 and args.model_type == "ligand_mpnn":
                     print(
                         f"The number of ligand atoms parsed is equal to: {number_of_atoms_parsed}"
                     )
