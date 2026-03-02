@@ -1,7 +1,0 @@
-"""
-Motif Scaffolding module for benchcore.
-Integrates MotifBench evaluation pipeline.
-"""
-from .motif_scaffolding_api import MotifScaffolding
-
-__all__ = ['MotifScaffolding']

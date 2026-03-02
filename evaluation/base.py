@@ -1,5 +1,5 @@
 """
-Base Evaluator for benchcore.
+Base Evaluator for designbench.
 
 This evaluator assumes standardized input:
 - Input: Directory containing PDB files (real residues, not Poly-Ala)

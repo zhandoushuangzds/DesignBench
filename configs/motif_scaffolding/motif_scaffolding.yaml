@@ -1,6 +1,6 @@
 # Motif Scaffolding configuration
-# Path to MotifBench directory
-motifbench_dir: /home/qiantai/zihan/Motif_Benchmark/MotifBench
+# Path to motif PDB files directory (optional, defaults to internal resources/motif_pdbs)
+# motif_pdbs_dir: /path/to/motif_pdbs
 
 # Python executable path for subprocesses (null = use current Python, single env suffices)
 python_path: /DATA/disk0/qtfeng/miniforge3/envs/design_benchmark/bin/python

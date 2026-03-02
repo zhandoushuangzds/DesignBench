@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-Run RFantibody for BenchCore antibody + nanobody tasks with accurate timing (single GPU).
+Run RFantibody for DesignBench antibody + nanobody tasks with accurate timing (single GPU).
 
 - By default skips proteinmpnn: only rfdiffusion -> qvextract (backbone PDBs). Use --run_proteinmpnn to run inverse fold.
 - Pass --rfdiffusion_extra to add Hydra overrides (e.g. diffuser.T=25 for fewer steps, or any inference.* key).
 Uses CUDA_VISIBLE_DEVICES to pin to one GPU. Records per-step and per-target elapsed time, writes CSV.
 
 Usage:
-  # From benchcore root; use GPU 1
+  # From designbench root; use GPU 1
   python algorithms/rfantibody/run_rfantibody_with_timing.py \
-    --benchcore_root /path/to/benchcore \
+    --designbench_root /path/to/designbench \
     --rfantibody_root /path/to/models/RFantibody \
     --output_dir /path/to/rfantibody_output \
     --task both \
@@ -29,8 +29,8 @@ from datetime import datetime
 from pathlib import Path
 
 
-def load_target_config(benchcore_root: Path) -> list[dict]:
-    cfg = benchcore_root / "assets" / "antibody_nanobody" / "config" / "target_config.csv"
+def load_target_config(designbench_root: Path) -> list[dict]:
+    cfg = designbench_root / "assets" / "antibody_nanobody" / "config" / "target_config.csv"
     if not cfg.exists():
         raise FileNotFoundError(f"Target config not found: {cfg}")
     rows = []
@@ -40,9 +40,9 @@ def load_target_config(benchcore_root: Path) -> list[dict]:
     return rows
 
 
-def antigen_path_for_target(benchcore_root: Path, target_id: str) -> Path | None:
+def antigen_path_for_target(designbench_root: Path, target_id: str) -> Path | None:
     """CIF 路径（用于 CIF→PDB 回退）。"""
-    antigens_dir = benchcore_root / "assets" / "antibody_nanobody" / "antigens"
+    antigens_dir = designbench_root / "assets" / "antibody_nanobody" / "antigens"
     p = antigens_dir / f"{target_id}.cif"
     if p.exists():
         return p
@@ -54,9 +54,9 @@ def antigen_path_for_target(benchcore_root: Path, target_id: str) -> Path | None
     return None
 
 
-def antigen_pdb_for_target(benchcore_root: Path, target_id: str, work_dir: Path, ensure_target_pdb_fn) -> Path | None:
+def antigen_pdb_for_target(designbench_root: Path, target_id: str, work_dir: Path, ensure_target_pdb_fn) -> Path | None:
     """优先使用 assets 下已裁剪的 antigens_cropped/{target_id}.pdb，否则用 ensure_target_pdb 从 CIF 转 PDB。"""
-    cropped = benchcore_root / "assets" / "antibody_nanobody" / "antigens_cropped" / f"{target_id}.pdb"
+    cropped = designbench_root / "assets" / "antibody_nanobody" / "antigens_cropped" / f"{target_id}.pdb"
     if cropped.exists():
         return cropped
     return ensure_target_pdb_fn(target_id)
@@ -104,10 +104,10 @@ def run_cmd_with_timing(
 
 def main():
     ap = argparse.ArgumentParser(description="Run RFantibody with timing (single GPU)")
-    ap.add_argument("--benchcore_root", type=Path, default=Path(__file__).resolve().parent.parent.parent)
+    ap.add_argument("--designbench_root", type=Path, default=Path(__file__).resolve().parent.parent.parent)
     ap.add_argument("--rfantibody_root", type=Path, default=None,
                     help="RFantibody repo root. If unset, rfdiffusion/proteinmpnn/qvextract must be on PATH.")
-    ap.add_argument("--output_dir", type=Path, default=Path("rfantibody_benchcore_output"))
+    ap.add_argument("--output_dir", type=Path, default=Path("rfantibody_designbench_output"))
     ap.add_argument("--task", choices=["antibody", "nanobody", "both"], default="both")
     ap.add_argument("--num_designs", type=int, default=100)
     ap.add_argument("--gpu", type=int, default=1, help="GPU ID to use (e.g. 1 for GPU1)")
@@ -124,7 +124,7 @@ def main():
     ap.add_argument("--rfdiffusion_cmd", type=str, default="rfdiffusion")
     ap.add_argument("--proteinmpnn_cmd", type=str, default="proteinmpnn")
     ap.add_argument("--qvextract_cmd", type=str, default="qvextract")
-    ap.add_argument("--skip_convert", action="store_true", help="Do not run BenchCore format conversion at end")
+    ap.add_argument("--skip_convert", action="store_true", help="Do not run DesignBench format conversion at end")
     ap.add_argument(
         "--target_slice",
         type=str,
@@ -140,19 +140,19 @@ def main():
     )
     args = ap.parse_args()
 
-    benchcore_root = args.benchcore_root.resolve()
-    if not benchcore_root.is_dir():
-        raise SystemExit(f"BenchCore root not found: {benchcore_root}")
+    designbench_root = args.designbench_root.resolve()
+    if not designbench_root.is_dir():
+        raise SystemExit(f"DesignBench root not found: {designbench_root}")
 
-    algo_dir = benchcore_root / "algorithms" / "rfantibody"
-    scaffolds_ab = benchcore_root / "assets" / "antibody_nanobody" / "scaffolds" / "antibody" / "hu-4D5-8_Fv.pdb"
-    scaffolds_nano = benchcore_root / "assets" / "antibody_nanobody" / "scaffolds" / "nanobody" / "h-NbBCII10.pdb"
+    algo_dir = designbench_root / "algorithms" / "rfantibody"
+    scaffolds_ab = designbench_root / "assets" / "antibody_nanobody" / "scaffolds" / "antibody" / "hu-4D5-8_Fv.pdb"
+    scaffolds_nano = designbench_root / "assets" / "antibody_nanobody" / "scaffolds" / "nanobody" / "h-NbBCII10.pdb"
     if not scaffolds_ab.exists():
         raise SystemExit(f"Antibody scaffold not found: {scaffolds_ab}")
     if not scaffolds_nano.exists():
         raise SystemExit(f"Nanobody scaffold not found: {scaffolds_nano}")
 
-    targets = load_target_config(benchcore_root)
+    targets = load_target_config(designbench_root)
     target_ids = [r.get("target_id", (list(r.values())[0] if r else "") or "").strip() for r in targets]
     target_ids = [t for t in target_ids if t and t != "target_id"]
 
@@ -195,16 +195,16 @@ def main():
             weights_rf = str(wdir / "RFdiffusion_Ab.pt")
         if (wdir / "ProteinMPNN_v48_noise_0.2.pt").exists():
             weights_pm = str(wdir / "ProteinMPNN_v48_noise_0.2.pt")
-    rf_cwd = str((args.rfantibody_root or benchcore_root).resolve())
+    rf_cwd = str((args.rfantibody_root or designbench_root).resolve())
 
     # Early check: can we get antigen PDB for first target? (avoid skipping all 22 silently)
     first_id = target_ids[0] if target_ids else None
     if first_id:
-        ac = antigen_path_for_target(benchcore_root, first_id)
+        ac = antigen_path_for_target(designbench_root, first_id)
         if not ac:
             raise SystemExit(
                 f"Antigen not found for first target {first_id}. "
-                f"Expected CIF at: {benchcore_root / 'assets' / 'antibody_nanobody' / 'antigens' / f'{first_id}.cif'}"
+                f"Expected CIF at: {designbench_root / 'assets' / 'antibody_nanobody' / 'antigens' / f'{first_id}.cif'}"
             )
         pdb_dir = work_dir / "antigen_pdb"
         pdb_dir.mkdir(parents=True, exist_ok=True)
@@ -224,16 +224,16 @@ def main():
                 "Install biopython: pip install biopython"
             )
         except FileNotFoundError:
-            raise SystemExit("cif_to_pdb.py not found. Run from benchcore root.")
+            raise SystemExit("cif_to_pdb.py not found. Run from designbench root.")
 
     # CIF→PDB (fail once with clear error so user sees e.g. "pip install biopython")
     _cif_to_pdb_error_logged = []
 
     def ensure_target_pdb(target_id: str) -> Path | None:
-        cif = antigen_path_for_target(benchcore_root, target_id)
+        cif = antigen_path_for_target(designbench_root, target_id)
         if not cif:
             if target_id not in _cif_to_pdb_error_logged:
-                print(f"Antigen CIF not found for {target_id} (expected {benchcore_root / 'assets' / 'antibody_nanobody' / 'antigens' / f'{target_id}.cif'})", file=sys.stderr)
+                print(f"Antigen CIF not found for {target_id} (expected {designbench_root / 'assets' / 'antibody_nanobody' / 'antigens' / f'{target_id}.cif'})", file=sys.stderr)
                 _cif_to_pdb_error_logged.append(target_id)
             return None
         pdb_dir = work_dir / "antigen_pdb"
@@ -304,7 +304,7 @@ def main():
                 w.writerow(rec)
 
     def _run_single_target(task: str, row_idx: int, row: dict) -> dict:
-        nonlocal benchcore_root, work_dir, framework_map, loops_ab, loops_nano
+        nonlocal designbench_root, work_dir, framework_map, loops_ab, loops_nano
 
         target_id = row.get("target_id", "").strip() or (list(row.values())[0] if row else "")
         if not target_id or target_id == "target_id":
@@ -317,7 +317,7 @@ def main():
         framework = framework_map[task]
         loops = loops_ab if task == "antibody" else loops_nano
 
-        target_pdb = antigen_pdb_for_target(benchcore_root, target_id, work_dir, ensure_target_pdb)
+        target_pdb = antigen_pdb_for_target(designbench_root, target_id, work_dir, ensure_target_pdb)
         if not target_pdb:
             print(f"[{row_idx}/{len(targets)}] Skip {target_id}: no antigen PDB", file=sys.stderr)
             return {
@@ -493,18 +493,18 @@ def main():
             avg = tot / len(recs)
             print(f"  Avg per target: {avg:.1f}s ({avg/60:.1f} min)")
 
-    # BenchCore format conversion
+    # DesignBench format conversion
     if not args.skip_convert:
-        conv_script = algo_dir / "convert_rfantibody_to_benchcore.py"
+        conv_script = algo_dir / "convert_rfantibody_to_designbench.py"
         if conv_script.exists():
-            print("\nRunning BenchCore format conversion...")
+            print("\nRunning DesignBench format conversion...")
             for task in tasks:
                 subprocess.run(
                     [
                         sys.executable, str(conv_script),
                         "--run_dirs", str(out_root / task),
-                        "--design_dir", str(out_root / "benchcore_format" / task),
-                        "--cdr_info_csv", str(out_root / "benchcore_format" / task / "cdr_info.csv"),
+                        "--design_dir", str(out_root / "designbench_format" / task),
+                        "--cdr_info_csv", str(out_root / "designbench_format" / task / "cdr_info.csv"),
                         "--task", task,
                         "--max_per_target", str(args.num_designs),
                         "--extracted_subdir", "extracted",
@@ -512,7 +512,7 @@ def main():
                     check=True,
                     cwd=str(algo_dir),
                 )
-            print("BenchCore format:", out_root / "benchcore_format")
+            print("DesignBench format:", out_root / "designbench_format")
     else:
         print("\nSkipped conversion (--skip_convert).")
 

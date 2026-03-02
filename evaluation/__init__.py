@@ -1,5 +1,5 @@
 """
-Evaluation module for benchcore.
+Evaluation module for designbench.
 
 Provides task-specific evaluators that assume standardized input format.
 """

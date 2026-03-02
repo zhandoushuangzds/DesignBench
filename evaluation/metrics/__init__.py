@@ -1,5 +1,5 @@
 """
-Metrics module for benchcore evaluation.
+Metrics module for designbench evaluation.
 
 Provides various structural and developability metrics for protein evaluation.
 """

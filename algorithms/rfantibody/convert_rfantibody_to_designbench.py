@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Convert RFantibody per-target output to BenchCore format.
+Convert RFantibody per-target output to DesignBench format.
 
 RFantibody per-target .qv files (when write_trajectory=True):
 - rfdiffusion.qv         : 主输出，每个 design 一个 tag（如 rfdiffusion_0），存的是扩散结束的最终结构 X0。
-                            用 qvextract 提出到 extracted/*.pdb 后，本脚本据此生成 BenchCore design_dir。
+                            用 qvextract 提出到 extracted/*.pdb 后，本脚本据此生成 DesignBench design_dir。
 - rfdiffusion_Xt-1_traj.qv : 轨迹，每 design 一 tag（如 rfdiffusion_0_Xt-1），每 tag 内为多帧去噪坐标 Xt-1。
 - rfdiffusion_pX0_traj.qv  : 轨迹，每 design 一 tag（如 rfdiffusion_0_pX0），每 tag 内为多帧模型预测 p(X0|Xt)。
 
@@ -14,16 +14,16 @@ RFantibody per-target .qv files (when write_trajectory=True):
 - Writes cdr_info.csv with 1-based inclusive CDR only (no sequences).
 
 Usage:
-  python convert_rfantibody_to_benchcore.py \
+  python convert_rfantibody_to_designbench.py \
     --run_dirs output/antibody \
-    --design_dir benchcore_designs/antibody \
-    --cdr_info_csv benchcore_designs/antibody/cdr_info.csv \
+    --design_dir designbench_designs/antibody \
+    --cdr_info_csv designbench_designs/antibody/cdr_info.csv \
     --task antibody
 
-  python convert_rfantibody_to_benchcore.py \
+  python convert_rfantibody_to_designbench.py \
     --run_dirs output/nanobody \
-    --design_dir benchcore_designs/nanobody \
-    --cdr_info_csv benchcore_designs/nanobody/cdr_info.csv \
+    --design_dir designbench_designs/nanobody \
+    --cdr_info_csv designbench_designs/nanobody/cdr_info.csv \
     --task nanobody
 """
 
@@ -33,7 +33,7 @@ import shutil
 import sys
 from pathlib import Path
 
-# BenchCore CDR: 1-based inclusive. Default antibody (Fab) from README.
+# DesignBench CDR: 1-based inclusive. Default antibody (Fab) from README.
 DEFAULT_AB_CDR = {
     "h_cdr1_start": 30, "h_cdr1_end": 35,
     "h_cdr2_start": 50, "h_cdr2_end": 65,
@@ -67,7 +67,7 @@ def get_chain_ids_from_pdb(pdb_path: Path) -> list:
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Convert RFantibody output to BenchCore design_dir + cdr_info.csv")
+    ap = argparse.ArgumentParser(description="Convert RFantibody output to DesignBench design_dir + cdr_info.csv")
     ap.add_argument("--run_dirs", type=Path, required=True,
                     help="Directory of per-target run dirs (e.g. output/antibody with 01_7UXQ, ...)")
     ap.add_argument("--design_dir", type=Path, required=True)
@@ -124,7 +124,7 @@ def main():
         w.writeheader()
         w.writerows(cdr_rows)
     print(f"Wrote {len(cdr_rows)} rows to {cdr_path}")
-    print(f"BenchCore design_dir: {design_dir} ({sum(1 for _ in design_dir.glob('*.pdb'))} PDBs)")
+    print(f"DesignBench design_dir: {design_dir} ({sum(1 for _ in design_dir.glob('*.pdb'))} PDBs)")
 
 
 if __name__ == "__main__":

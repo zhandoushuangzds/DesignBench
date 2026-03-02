@@ -1,34 +1,38 @@
 # Motif Scaffolding Module
 
-This module integrates [MotifBench](https://github.com/trippelab/MotifBench) into benchcore for evaluating motif scaffolding designs.
+This module integrates [MotifBench](https://github.com/trippelab/MotifBench) into designbench for evaluating motif scaffolding designs.
 
 ## Overview
 
 Motif scaffolding is a central task in computational protein design: given the coordinates of atoms in a geometry chosen to confer a desired biochemical function (a motif), the goal is to identify diverse protein structures (scaffolds) that include the motif and stabilize its geometry.
 
-This module integrates MotifBench evaluation into benchcore following the **inversefold + refold paradigm**:
+This module integrates MotifBench evaluation into designbench following the **inversefold + refold paradigm**:
 
-1. **InverseFold**: Uses benchcore's InverseFold API (e.g., ProteinMPNN) to design sequences for given scaffolds
-2. **ReFold**: Uses benchcore's ReFold API (e.g., ESMFold) to predict structures from designed sequences
+1. **InverseFold**: Uses designbench's InverseFold API (e.g., ProteinMPNN) to design sequences for given scaffolds
+2. **ReFold**: Uses designbench's ReFold API (e.g., ESMFold) to predict structures from designed sequences
 3. **MotifBench Analysis**: Calculates motif-specific metrics (RMSD, novelty, diversity) using MotifBench's analysis modules
 
 ## Requirements
 
-1. **MotifBench**: The MotifBench repository must be available locally
+1. **Motif PDB Files**: Motif PDB files must be available (see Configuration section)
 2. **Foldseek**: Required for novelty calculation
-3. **Python environment**: With MotifBench dependencies installed
+3. **Python environment**: With required dependencies installed
 
 ## Configuration
 
 Edit `configs/motif_scaffolding.yaml`:
 
 ```yaml
-motifbench_dir: /path/to/MotifBench
+# Optional: Path to motif PDB files directory (defaults to internal resources/motif_pdbs)
+motif_pdbs_dir: /path/to/motif_pdbs
+
 python_path: /path/to/python
 foldseek_database: /path/to/foldseek/database
 gpu_id: 0  # Optional
 motif_list: null  # Optional, evaluates all if null
 ```
+
+**Note**: If `motif_pdbs_dir` is not specified, the system will use the default internal location at `evaluation/motif_scaffolding/resources/motif_pdbs/`. You can copy motif PDB files from MotifBench to this directory, or configure a custom path.
 
 ## Usage
 
@@ -56,7 +60,7 @@ from omegaconf import DictConfig
 
 config = DictConfig({
     'motif_scaffolding': {
-        'motifbench_dir': '/path/to/MotifBench',
+        'motif_pdbs_dir': '/path/to/motif_pdbs',  # Optional
         'python_path': '/path/to/python',
         'foldseek_database': '/path/to/foldseek/db'
     }
@@ -126,9 +130,9 @@ MotifBench evaluates designs on:
 - **Novelty**: Structural novelty compared to PDB database
 - **Diversity**: Structural diversity among successful designs
 
-## Integration with benchcore
+## Integration with designbench
 
-This module can be integrated into the full benchcore pipeline:
+This module can be integrated into the full designbench pipeline:
 
 ```python
 # In a custom pipeline script

@@ -1,14 +1,14 @@
-# BenchCore nanobody target 19_1WAK
+# DesignBench nanobody target 19_1WAK
 # Generated for BoltzGen; 100 designs per target.
 entities:
   - file:
-      path: /home/qiantai/zihan/benchcore/assets/antibody_nanobody/antigens/19_3CH4.cif
+      path: /home/qiantai/zihan/designbench/assets/antibody_nanobody/antigens/19_3CH4.cif
       include:
             - chain:
                 id: B
   - file:
         path:
-            - /home/qiantai/zihan/benchcore/assets/antibody_nanobody/scaffolds/nanobody/7eow.yaml
-            - /home/qiantai/zihan/benchcore/assets/antibody_nanobody/scaffolds/nanobody/7xl0.yaml
-            - /home/qiantai/zihan/benchcore/assets/antibody_nanobody/scaffolds/nanobody/8coh.yaml
-            - /home/qiantai/zihan/benchcore/assets/antibody_nanobody/scaffolds/nanobody/8z8v.yaml
+            - /home/qiantai/zihan/designbench/assets/antibody_nanobody/scaffolds/nanobody/7eow.yaml
+            - /home/qiantai/zihan/designbench/assets/antibody_nanobody/scaffolds/nanobody/7xl0.yaml
+            - /home/qiantai/zihan/designbench/assets/antibody_nanobody/scaffolds/nanobody/8coh.yaml
+            - /home/qiantai/zihan/designbench/assets/antibody_nanobody/scaffolds/nanobody/8z8v.yaml

@@ -1,12 +1,12 @@
-# BenchCore nanobody target 09_4G8A
+# DesignBench nanobody target 09_4G8A
 # Generated for BoltzGen; 100 designs per target.
 entities:
   - file:
-      path: /home/qiantai/zihan/benchcore/assets/antibody_nanobody/antigens/09_4G8A.cif
+      path: /home/qiantai/zihan/designbench/assets/antibody_nanobody/antigens/09_4G8A.cif
       include:
             - chain:
                 id: A
             - chain:
                 id: B
   - file:
-        path: /home/qiantai/zihan/benchcore/assets/antibody_nanobody/scaffolds/nanobody/h-NbBCII10.yaml
+        path: /home/qiantai/zihan/designbench/assets/antibody_nanobody/scaffolds/nanobody/h-NbBCII10.yaml

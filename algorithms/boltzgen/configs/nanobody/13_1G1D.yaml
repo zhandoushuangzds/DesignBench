@@ -1,14 +1,14 @@
-# BenchCore nanobody target 13_1G1D
+# DesignBench nanobody target 13_1G1D
 # Generated for BoltzGen; 100 designs per target.
 entities:
   - file:
-      path: /home/qiantai/zihan/benchcore/assets/antibody_nanobody/antigens/13_1G13.cif
+      path: /home/qiantai/zihan/designbench/assets/antibody_nanobody/antigens/13_1G13.cif
       include:
             - chain:
                 id: A
   - file:
         path:
-            - /home/qiantai/zihan/benchcore/assets/antibody_nanobody/scaffolds/nanobody/7eow.yaml
-            - /home/qiantai/zihan/benchcore/assets/antibody_nanobody/scaffolds/nanobody/7xl0.yaml
-            - /home/qiantai/zihan/benchcore/assets/antibody_nanobody/scaffolds/nanobody/8coh.yaml
-            - /home/qiantai/zihan/benchcore/assets/antibody_nanobody/scaffolds/nanobody/8z8v.yaml
+            - /home/qiantai/zihan/designbench/assets/antibody_nanobody/scaffolds/nanobody/7eow.yaml
+            - /home/qiantai/zihan/designbench/assets/antibody_nanobody/scaffolds/nanobody/7xl0.yaml
+            - /home/qiantai/zihan/designbench/assets/antibody_nanobody/scaffolds/nanobody/8coh.yaml
+            - /home/qiantai/zihan/designbench/assets/antibody_nanobody/scaffolds/nanobody/8z8v.yaml

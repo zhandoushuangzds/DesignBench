@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 """
-Convert BoltzGen per-target output to BenchCore antibody/nanobody format.
+Convert BoltzGen per-target output to DesignBench antibody/nanobody format.
 
 - Copies/renames CIFs to design_dir as {target_id}_0.cif ... {target_id}_99.cif.
 - Writes cdr_info.csv with one row per design (id = 01_7UXQ_0, ...), 1-based inclusive CDR only (no sequences).
 
 Usage:
   # After running BoltzGen per target (e.g. output/antibody/01_7UXQ, ...)
-  python convert_boltzgen_to_benchcore.py \
+  python convert_boltzgen_to_designbench.py \
     --run_dirs output/antibody \
-    --design_dir benchcore_designs/antibody \
-    --cdr_info_csv benchcore_designs/antibody/cdr_info.csv \
+    --design_dir designbench_designs/antibody \
+    --cdr_info_csv designbench_designs/antibody/cdr_info.csv \
     --task antibody
 
-  python convert_boltzgen_to_benchcore.py \
+  python convert_boltzgen_to_designbench.py \
     --run_dirs output/nanobody \
-    --design_dir benchcore_designs/nanobody \
-    --cdr_info_csv benchcore_designs/nanobody/cdr_info.csv \
+    --design_dir designbench_designs/nanobody \
+    --cdr_info_csv designbench_designs/nanobody/cdr_info.csv \
     --task nanobody
 """
 
@@ -221,7 +221,7 @@ def infer_cdr_vhh(res_ids: list, cys_positions: list):
         h3_s, h3_e = max(0, n - 25), n
     return (h1_s, h1_e, h2_s, h2_e, h3_s, h3_e)
 
-# BenchCore CDR CSV: 1-based inclusive. Default antibody (Fab) CDR from README.
+# DesignBench CDR CSV: 1-based inclusive. Default antibody (Fab) CDR from README.
 DEFAULT_AB_CDR = {
     "h_cdr1_start": 30, "h_cdr1_end": 35,
     "h_cdr2_start": 50, "h_cdr2_end": 65,
@@ -388,10 +388,10 @@ def get_nanobody_cdr_row(cif_path: Path, npz_path: Path | None, nanobody_chain: 
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Convert BoltzGen output to BenchCore design_dir + cdr_info.csv")
+    ap = argparse.ArgumentParser(description="Convert BoltzGen output to DesignBench design_dir + cdr_info.csv")
     ap.add_argument("--run_dirs", type=Path, required=True,
                     help="Directory containing per-target run dirs (e.g. output/antibody with 01_7UXQ, 02_1TNF, ...)")
-    ap.add_argument("--design_dir", type=Path, required=True, help="Output design directory for BenchCore")
+    ap.add_argument("--design_dir", type=Path, required=True, help="Output design directory for DesignBench")
     ap.add_argument("--cdr_info_csv", type=Path, required=True, help="Output cdr_info.csv path")
     ap.add_argument("--task", choices=["antibody", "nanobody"], required=True)
     ap.add_argument("--max_per_target", type=int, default=100)
@@ -435,7 +435,7 @@ def main():
             shutil.copy2(src, dest)
         print(f"Copied {len(cif_files)} designs for {target_id} -> {design_dir}")
 
-        # One CDR row per design (BenchCore: id = 01_7UXQ_0, 01_7UXQ_1, ...)
+        # One CDR row per design (DesignBench: id = 01_7UXQ_0, 01_7UXQ_1, ...)
         # BoltzGen output order: antigen chains first, then scaffold H, then L (antibody) or H only (nanobody)
         for i, cif_path in enumerate(cif_files):
             design_id = f"{target_id}_{i}"
@@ -478,7 +478,7 @@ def main():
         w.writeheader()
         w.writerows(cdr_rows)
     print(f"Wrote {len(cdr_rows)} rows to {cdr_path}")
-    print(f"BenchCore design_dir: {design_dir} ({sum(1 for _ in design_dir.glob('*.cif'))} CIFs)")
+    print(f"DesignBench design_dir: {design_dir} ({sum(1 for _ in design_dir.glob('*.cif'))} CIFs)")
 
 
 if __name__ == "__main__":

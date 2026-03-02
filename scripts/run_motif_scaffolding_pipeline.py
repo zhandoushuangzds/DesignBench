@@ -1,6 +1,6 @@
 """
 Pipeline script for motif scaffolding evaluation.
-Follows benchcore's Generator + Evaluator architecture.
+Follows designbench's Generator + Evaluator architecture.
 
 New Architecture Pipeline:
 1. Generator.run() -> Standardize model outputs (model-specific fixes)
@@ -21,7 +21,7 @@ from omegaconf import DictConfig, OmegaConf
 from pathlib import Path
 import sys
 
-# Add benchcore to path
+# Add designbench to path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from evaluation.motif_scaffolding_evaluation import MotifScaffoldingEvaluation

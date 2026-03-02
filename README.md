@@ -553,9 +553,9 @@ python scripts/run_antibody_pipeline.py \
 **Quick validation (first target, first design only):**
 ```bash
 python scripts/run_antibody_pipeline.py \
-    design_dir=/path/to/boltzgen_output/antibody_benchcore_1per/design_dir \
+    design_dir=/path/to/boltzgen_output/antibody_designbench_1per/design_dir \
     antibody_type=antibody \
-    cdr_info_csv=/path/to/boltzgen_output/antibody_benchcore_1per/cdr_info.csv \
+    cdr_info_csv=/path/to/boltzgen_output/antibody_designbench_1per/cdr_info.csv \
     target_config_path=assets/antibody_nanobody/config/target_config.csv \
     max_designs_per_target=1 \
     max_targets=1 \
@@ -730,7 +730,7 @@ from omegaconf import DictConfig
 config = DictConfig({
     'motif_scaffolding': {
         'model_name': 'PPIFlow',  # or 'RFD3'
-        'motifbench_dir': '/path/to/MotifBench',
+        'motif_pdbs_dir': '/path/to/motif_pdbs',  # Optional: defaults to internal resources
         'foldseek_database': '/path/to/foldseek/db'
     },
     'gpus': '0'

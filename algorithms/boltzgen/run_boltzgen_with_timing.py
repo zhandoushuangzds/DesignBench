@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Run BoltzGen for BenchCore targets with accurate timing records.
+Run BoltzGen for DesignBench targets with accurate timing records.
 
 Usage:
   python run_boltzgen_with_timing.py \
-    --benchcore_root /path/to/benchcore \
+    --designbench_root /path/to/designbench \
     --output_dir /path/to/boltzgen_output \
     --boltzgen_env /DATA/disk0/qtfeng/miniforge3/envs/boltzgen \
     --task both \
@@ -22,8 +22,8 @@ from datetime import datetime
 from pathlib import Path
 
 
-def load_target_ids(benchcore_root: Path) -> list[str]:
-    cfg = benchcore_root / "assets" / "antibody_nanobody" / "config" / "target_config.csv"
+def load_target_ids(designbench_root: Path) -> list[str]:
+    cfg = designbench_root / "assets" / "antibody_nanobody" / "config" / "target_config.csv"
     if not cfg.exists():
         raise FileNotFoundError(f"Target config not found: {cfg}")
     import csv as csv_module
@@ -115,8 +115,8 @@ def run_boltzgen_with_timing(
 
 def main():
     ap = argparse.ArgumentParser(description="Run BoltzGen with timing records")
-    ap.add_argument("--benchcore_root", type=Path, default=Path.cwd(),
-                    help="BenchCore repo root")
+    ap.add_argument("--designbench_root", type=Path, default=Path.cwd(),
+                    help="DesignBench repo root")
     ap.add_argument("--output_dir", type=Path, required=True,
                     help="Base output directory")
     ap.add_argument("--boltzgen_env", type=Path, required=True,
@@ -133,9 +133,9 @@ def main():
                          "If not specified, will try to use HF_HOME environment variable.")
     args = ap.parse_args()
 
-    benchcore_root = args.benchcore_root.resolve()
-    if not benchcore_root.is_dir():
-        raise SystemExit(f"BenchCore root not found: {benchcore_root}")
+    designbench_root = args.designbench_root.resolve()
+    if not designbench_root.is_dir():
+        raise SystemExit(f"DesignBench root not found: {designbench_root}")
 
     # Construct boltzgen command from environment path
     boltzgen_env = Path(args.boltzgen_env).resolve()
@@ -179,9 +179,9 @@ def main():
         boltzgen_cmd = f"{boltzgen_python} -m boltzgen"
         print(f"Note: Using '{boltzgen_cmd}' (boltzgen binary not found)", file=sys.stderr)
 
-    algo_boltz = benchcore_root / "algorithms" / "boltzgen"
+    algo_boltz = designbench_root / "algorithms" / "boltzgen"
     configs_dir = algo_boltz / "configs"
-    target_ids = load_target_ids(benchcore_root)
+    target_ids = load_target_ids(designbench_root)
 
     tasks = ["antibody", "nanobody"] if args.task == "both" else [args.task]
     protocol_map = {"antibody": "antibody-anything", "nanobody": "nanobody-anything"}

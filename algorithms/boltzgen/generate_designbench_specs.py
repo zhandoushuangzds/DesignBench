@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-Generate BoltzGen design spec YAMLs for all 22 BenchCore antibody/nanobody targets.
+Generate BoltzGen design spec YAMLs for all 22 DesignBench antibody/nanobody targets.
 
 Each target gets one YAML for antibody (Fab) and one for nanobody (VHH). Outputs go to
-configs/antibody/ and configs/nanobody/. Antigen CIFs are read from BenchCore assets;
-scaffolds from BenchCore scaffolds (nanobody) or a mix of BenchCore + BoltzGen (antibody).
+configs/antibody/ and configs/nanobody/. Antigen CIFs are read from DesignBench assets;
+scaffolds from DesignBench scaffolds (nanobody) or a mix of DesignBench + BoltzGen (antibody).
 
 Usage:
-  python generate_benchcore_specs.py --benchcore_root /path/to/benchcore [--boltzgen_example /path/to/boltzgen/example]
-  Default benchcore_root: parent of this file's parent (benchcore repo root).
+  python generate_designbench_specs.py --designbench_root /path/to/designbench [--boltzgen_example /path/to/boltzgen/example]
+  Default designbench_root: parent of this file's parent (designbench repo root).
 """
 
 import argparse
@@ -16,10 +16,10 @@ import re
 import sys
 from pathlib import Path
 
-# BenchCore target config is under benchcore_root/assets/antibody_nanobody/config/target_config.csv
-# Antigens: benchcore_root/assets/antibody_nanobody/antigens/{target_id}.cif
-# Nanobody scaffolds: benchcore_root/assets/antibody_nanobody/scaffolds/nanobody/*.yaml (7eow, 7xl0, 8coh, 8z8v)
-# Antibody Part 1: hu-4D5-8_Fv.pdb (BenchCore); Part 2: multiple Fab YAMLs (BenchCore or BoltzGen example)
+# DesignBench target config is under designbench_root/assets/antibody_nanobody/config/target_config.csv
+# Antigens: designbench_root/assets/antibody_nanobody/antigens/{target_id}.cif
+# Nanobody scaffolds: designbench_root/assets/antibody_nanobody/scaffolds/nanobody/*.yaml (7eow, 7xl0, 8coh, 8z8v)
+# Antibody Part 1: hu-4D5-8_Fv.pdb (DesignBench); Part 2: multiple Fab YAMLs (DesignBench or BoltzGen example)
 
 
 def parse_antigen_chains(antigen_chains: str):
@@ -36,8 +36,8 @@ def parse_antigen_chains(antigen_chains: str):
     return list(dict.fromkeys(chain_ids))  # preserve order, no dupes
 
 
-def load_target_config(benchcore_root: Path):
-    cfg_path = benchcore_root / "assets" / "antibody_nanobody" / "config" / "target_config.csv"
+def load_target_config(designbench_root: Path):
+    cfg_path = designbench_root / "assets" / "antibody_nanobody" / "config" / "target_config.csv"
     if not cfg_path.exists():
         raise FileNotFoundError(f"Target config not found: {cfg_path}")
     import csv
@@ -76,7 +76,7 @@ def write_nanobody_yaml(
         scaffold_yaml = f"        path: {yaml_escape_path(scaffold_paths[0])}"
     else:
         scaffold_yaml = "        path:\n" + "\n".join(f"            - {yaml_escape_path(p)}" for p in scaffold_paths)
-    content = f"""# BenchCore nanobody target {target_id}
+    content = f"""# DesignBench nanobody target {target_id}
 # Generated for BoltzGen; 100 designs per target.
 entities:
   - file:
@@ -104,7 +104,7 @@ def write_antibody_yaml(
         scaffold_yaml = f"        path: {yaml_escape_path(scaffold_paths[0])}"
     else:
         scaffold_yaml = "        path:\n" + "\n".join(f"            - {yaml_escape_path(p)}" for p in scaffold_paths)
-    content = f"""# BenchCore antibody (Fab) target {target_id}
+    content = f"""# DesignBench antibody (Fab) target {target_id}
 # Generated for BoltzGen; 100 designs per target.
 entities:
   - file:
@@ -119,12 +119,12 @@ entities:
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Generate BoltzGen design specs for BenchCore 22 targets")
+    ap = argparse.ArgumentParser(description="Generate BoltzGen design specs for DesignBench 22 targets")
     ap.add_argument(
-        "--benchcore_root",
+        "--designbench_root",
         type=Path,
         default=Path(__file__).resolve().parent.parent.parent,
-        help="BenchCore repo root (default: parent of algorithms/boltzgen)",
+        help="DesignBench repo root (default: parent of algorithms/boltzgen)",
     )
     ap.add_argument(
         "--out_dir",
@@ -133,13 +133,13 @@ def main():
         help="Output directory for configs (default: algorithms/boltzgen/configs)",
     )
     args = ap.parse_args()
-    benchcore_root = args.benchcore_root.resolve()
+    designbench_root = args.designbench_root.resolve()
     out_dir = args.out_dir.resolve()
-    antigens_dir = benchcore_root / "assets" / "antibody_nanobody" / "antigens"
-    nano_scaffolds_dir = benchcore_root / "assets" / "antibody_nanobody" / "scaffolds" / "nanobody"
-    ab_scaffolds_dir = benchcore_root / "assets" / "antibody_nanobody" / "scaffolds" / "antibody"
+    antigens_dir = designbench_root / "assets" / "antibody_nanobody" / "antigens"
+    nano_scaffolds_dir = designbench_root / "assets" / "antibody_nanobody" / "scaffolds" / "nanobody"
+    ab_scaffolds_dir = designbench_root / "assets" / "antibody_nanobody" / "scaffolds" / "antibody"
 
-    targets = load_target_config(benchcore_root)
+    targets = load_target_config(designbench_root)
     # Nanobody scaffolds: Part 1 fixed h-NbBCII10 (3EAK), Part 2 uses whitelist (7eow, 7xl0, 8coh, 8z8v)
     nano_part1_fixed = nano_scaffolds_dir / "h-NbBCII10.yaml"  # Part 1 fixed scaffold
     nano_scaffold_yamls = []

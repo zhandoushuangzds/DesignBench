@@ -1,28 +1,28 @@
 #!/usr/bin/env python3
 """
-Run RFantibody for all 22 BenchCore antibody/nanobody targets (100 designs per target),
-then convert output to BenchCore design_dir + cdr_info.csv.
+Run RFantibody for all 22 DesignBench antibody/nanobody targets (100 designs per target),
+then convert output to DesignBench design_dir + cdr_info.csv.
 
 Prerequisites:
 - RFantibody installed (see models/RFantibody/README.md). Activate env or use uv run.
-- BenchCore assets: antigens (CIF), scaffolds (hu-4D5-8_Fv.pdb, h-NbBCII10.pdb).
+- DesignBench assets: antigens (CIF), scaffolds (hu-4D5-8_Fv.pdb, h-NbBCII10.pdb).
 
 Steps:
 1. For each target: convert antigen CIF→PDB (if needed), run rfdiffusion → proteinmpnn → qvextract.
-2. Convert per-target PDBs to BenchCore format (design_dir + cdr_info.csv).
+2. Convert per-target PDBs to DesignBench format (design_dir + cdr_info.csv).
 
 Usage:
-  # From benchcore root; RFantibody in ../models/RFantibody
-  python algorithms/rfantibody/run_rfantibody_benchcore.py \
-    --benchcore_root /path/to/benchcore \
+  # From designbench root; RFantibody in ../models/RFantibody
+  python algorithms/rfantibody/run_rfantibody_designbench.py \
+    --designbench_root /path/to/designbench \
     --rfantibody_root /path/to/models/RFantibody \
-    --output_dir /path/to/rfantibody_benchcore_output \
+    --output_dir /path/to/rfantibody_designbench_output \
     --task both \
     --num_designs 100
 
   # Only convert existing runs
-  python algorithms/rfantibody/run_rfantibody_benchcore.py \
-    --benchcore_root . --output_dir out --convert_only --task both
+  python algorithms/rfantibody/run_rfantibody_designbench.py \
+    --designbench_root . --output_dir out --convert_only --task both
 """
 
 import argparse
@@ -33,8 +33,8 @@ import sys
 from pathlib import Path
 
 
-def load_target_config(benchcore_root: Path) -> list[dict]:
-    cfg = benchcore_root / "assets" / "antibody_nanobody" / "config" / "target_config.csv"
+def load_target_config(designbench_root: Path) -> list[dict]:
+    cfg = designbench_root / "assets" / "antibody_nanobody" / "config" / "target_config.csv"
     if not cfg.exists():
         raise FileNotFoundError(f"Target config not found: {cfg}")
     rows = []
@@ -44,8 +44,8 @@ def load_target_config(benchcore_root: Path) -> list[dict]:
     return rows
 
 
-def antigen_path_for_target(benchcore_root: Path, target_id: str) -> Path | None:
-    antigens_dir = benchcore_root / "assets" / "antibody_nanobody" / "antigens"
+def antigen_path_for_target(designbench_root: Path, target_id: str) -> Path | None:
+    antigens_dir = designbench_root / "assets" / "antibody_nanobody" / "antigens"
     p = antigens_dir / f"{target_id}.cif"
     if p.exists():
         return p
@@ -58,32 +58,32 @@ def antigen_path_for_target(benchcore_root: Path, target_id: str) -> Path | None
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Run RFantibody for 22 BenchCore targets and convert to BenchCore format")
-    ap.add_argument("--benchcore_root", type=Path, default=Path(__file__).resolve().parent.parent.parent)
+    ap = argparse.ArgumentParser(description="Run RFantibody for 22 DesignBench targets and convert to DesignBench format")
+    ap.add_argument("--designbench_root", type=Path, default=Path(__file__).resolve().parent.parent.parent)
     ap.add_argument("--rfantibody_root", type=Path, default=None,
                     help="RFantibody repo root (for uv run / rfdiffusion). If unset, use PATH.")
-    ap.add_argument("--output_dir", type=Path, default=Path("rfantibody_benchcore_output"))
+    ap.add_argument("--output_dir", type=Path, default=Path("rfantibody_designbench_output"))
     ap.add_argument("--task", choices=["antibody", "nanobody", "both"], default="both")
     ap.add_argument("--num_designs", type=int, default=100)
-    ap.add_argument("--convert_only", action="store_true", help="Only convert existing runs to BenchCore format")
+    ap.add_argument("--convert_only", action="store_true", help="Only convert existing runs to DesignBench format")
     ap.add_argument("--rfdiffusion_cmd", type=str, default="rfdiffusion")
     ap.add_argument("--proteinmpnn_cmd", type=str, default="proteinmpnn")
     ap.add_argument("--qvextract_cmd", type=str, default="qvextract")
     args = ap.parse_args()
 
-    benchcore_root = args.benchcore_root.resolve()
-    if not benchcore_root.is_dir():
-        raise SystemExit(f"BenchCore root not found: {benchcore_root}")
+    designbench_root = args.designbench_root.resolve()
+    if not designbench_root.is_dir():
+        raise SystemExit(f"DesignBench root not found: {designbench_root}")
 
-    algo_dir = benchcore_root / "algorithms" / "rfantibody"
-    scaffolds_ab = benchcore_root / "assets" / "antibody_nanobody" / "scaffolds" / "antibody" / "hu-4D5-8_Fv.pdb"
-    scaffolds_nano = benchcore_root / "assets" / "antibody_nanobody" / "scaffolds" / "nanobody" / "h-NbBCII10.pdb"
+    algo_dir = designbench_root / "algorithms" / "rfantibody"
+    scaffolds_ab = designbench_root / "assets" / "antibody_nanobody" / "scaffolds" / "antibody" / "hu-4D5-8_Fv.pdb"
+    scaffolds_nano = designbench_root / "assets" / "antibody_nanobody" / "scaffolds" / "nanobody" / "h-NbBCII10.pdb"
     if not scaffolds_ab.exists():
         raise SystemExit(f"Antibody scaffold not found: {scaffolds_ab}")
     if not scaffolds_nano.exists():
         raise SystemExit(f"Nanobody scaffold not found: {scaffolds_nano}")
 
-    targets = load_target_config(benchcore_root)
+    targets = load_target_config(designbench_root)
     target_ids = [r.get("target_id", (list(r.values())[0] if r else "") or "").strip() for r in targets]
     target_ids = [t for t in target_ids if t and t != "target_id"]
 
@@ -94,7 +94,7 @@ def main():
 
     # CIF→PDB helper
     def ensure_target_pdb(target_id: str) -> Path | None:
-        cif = antigen_path_for_target(benchcore_root, target_id)
+        cif = antigen_path_for_target(designbench_root, target_id)
         if not cif:
             return None
         pdb_dir = work_dir / "antigen_pdb"
@@ -146,7 +146,7 @@ def main():
                 extracted_dir = target_out / "extracted"
                 target_pdb_str = str(target_pdb.resolve())
                 framework_str = str(Path(framework).resolve())
-                rf_cwd = (args.rfantibody_root or benchcore_root).resolve()
+                rf_cwd = (args.rfantibody_root or designbench_root).resolve()
                 # 1. rfdiffusion
                 cmd_rf = [
                     args.rfdiffusion_cmd,
@@ -185,13 +185,13 @@ def main():
                 if ret.returncode != 0:
                     print(f"qvextract failed for {target_id}", file=sys.stderr)
 
-    # Convert to BenchCore format
-    conv_script = algo_dir / "convert_rfantibody_to_benchcore.py"
+    # Convert to DesignBench format
+    conv_script = algo_dir / "convert_rfantibody_to_designbench.py"
     if not conv_script.exists():
         raise SystemExit(f"Converter not found: {conv_script}")
     for task in tasks:
         run_dirs = out_root / task
-        design_dir = out_root / "benchcore_format" / task
+        design_dir = out_root / "designbench_format" / task
         cdr_csv = design_dir / "cdr_info.csv"
         design_dir.mkdir(parents=True, exist_ok=True)
         # Converter expects PDBs in run_dirs/<target_id>/extracted/ or run_dirs/<target_id>/
@@ -208,9 +208,9 @@ def main():
             check=True,
             cwd=str(algo_dir),
         )
-    print("BenchCore-ready outputs under", out_root / "benchcore_format")
-    print("Antibody: design_dir =", out_root / "benchcore_format" / "antibody", ", cdr_info_csv =", out_root / "benchcore_format" / "antibody" / "cdr_info.csv")
-    print("Nanobody: design_dir =", out_root / "benchcore_format" / "nanobody", ", cdr_info_csv =", out_root / "benchcore_format" / "nanobody" / "cdr_info.csv")
+    print("DesignBench-ready outputs under", out_root / "designbench_format")
+    print("Antibody: design_dir =", out_root / "designbench_format" / "antibody", ", cdr_info_csv =", out_root / "designbench_format" / "antibody" / "cdr_info.csv")
+    print("Nanobody: design_dir =", out_root / "designbench_format" / "nanobody", ", cdr_info_csv =", out_root / "designbench_format" / "nanobody" / "cdr_info.csv")
 
 
 if __name__ == "__main__":

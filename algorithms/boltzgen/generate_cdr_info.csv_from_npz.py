@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Generate BenchCore cdr_info.csv from BoltzGen nanobody CIF + NPZ outputs.
+Generate DesignBench cdr_info.csv from BoltzGen nanobody CIF + NPZ outputs.
 
 When .npz exists next to .cif, uses design_mask from NPZ (BoltzGen's actual
 redesign regions). Otherwise falls back to sequence-based CDR inference.
-Indices are 0-based; for TNP mode BenchCore uses end EXCLUSIVE (range(start, end)).
+Indices are 0-based; for TNP mode DesignBench uses end EXCLUSIVE (range(start, end)).
 
 Usage:
-    python boltzgen_to_benchcore_cdr.py \
+    python boltzgen_to_designbench_cdr.py \
         --cif_dir intermediate_designs \
         --out cdr_info.csv \
         [--nanobody_chain B]
@@ -178,7 +178,7 @@ def infer_cdr_vhh(res_ids: list, cys_positions: list):
     - CDR3: 95 to second CYS - 1 (inclusive).
 
     Returns (h_cdr1_start, h_cdr1_end, h_cdr2_start, h_cdr2_end, h_cdr3_start, h_cdr3_end)
-    as 0-based indices; end is EXCLUSIVE (one past last) for BenchCore TNP.
+    as 0-based indices; end is EXCLUSIVE (one past last) for DesignBench TNP.
     """
     if not res_ids or len(res_ids) < 60:
         return None
@@ -197,7 +197,7 @@ def infer_cdr_vhh(res_ids: list, cys_positions: list):
         end_0 = res_id_to_idx.get(end_1_inclusive)
         if start_0 is None or end_0 is None:
             return None, None
-        # BenchCore TNP: end exclusive
+        # DesignBench TNP: end exclusive
         return start_0, end_0 + 1
 
     # Typical VHH: CDR1 26-35, CDR2 51-57, CDR3 95 to (second CYS - 1)
@@ -225,7 +225,7 @@ def infer_cdr_vhh(res_ids: list, cys_positions: list):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Generate BenchCore cdr_info.csv from BoltzGen nanobody CIFs")
+    ap = argparse.ArgumentParser(description="Generate DesignBench cdr_info.csv from BoltzGen nanobody CIFs")
     ap.add_argument("--cif_dir", type=Path, default=Path("intermediate_designs"), help="Directory of CIF files")
     ap.add_argument("--out", type=Path, default=Path("cdr_info.csv"), help="Output CSV path")
     ap.add_argument("--nanobody_chain", type=str, default="B", help="Chain ID of nanobody in CIF (default B)")
@@ -277,7 +277,7 @@ def main():
             continue
 
         h1_s, h1_e, h2_s, h2_e, h3_s, h3_e = cdrs
-        # BenchCore CSV: id, h_cdr1_start, h_cdr1_end, ... (no sequences)
+        # DesignBench CSV: id, h_cdr1_start, h_cdr1_end, ... (no sequences)
         rows.append({
             "id": sample_id,
             "h_cdr1_start": h1_s,
@@ -307,7 +307,7 @@ def main():
         w.writerows(rows)
 
     print(f"Wrote {len(rows)} rows to {out_path}")
-    print("BenchCore TNP uses 0-based indices; CDR end is exclusive.")
+    print("DesignBench TNP uses 0-based indices; CDR end is exclusive.")
 
 
 if __name__ == "__main__":

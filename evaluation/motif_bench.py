@@ -1,5 +1,5 @@
 """
-Motif Scaffolding Evaluation for benchcore.
+Motif Scaffolding Evaluation for designbench.
 
 Assumes standardized input:
 - PDB files with real residues (not Poly-Ala)
@@ -37,28 +37,36 @@ class MotifBenchEvaluator(BaseEvaluator):
     def __init__(self, config):
         super().__init__(config)
         
-        # Validate MotifBench path if needed
-        if hasattr(config, 'motif_scaffolding'):
-            self.motifbench_dir = Path(config.motif_scaffolding.motifbench_dir)
-            self.motif_pdbs_dir = self.motifbench_dir / "motif_pdbs"
-            self.scaffold_lab_dir = self.motifbench_dir / "Scaffold-Lab"
-            
-            # Import MotifBench analysis modules
-            try:
-                import sys
-                sys.path.insert(0, str(self.scaffold_lab_dir))
-                from analysis import utils as au
-                from analysis import diversity as du
-                from analysis import novelty as nu
-                self.au = au
-                self.du = du
-                self.nu = nu
-            except ImportError as e:
-                self.logger.warning(f"MotifBench analysis modules not available: {e}")
-                self.au = self.du = self.nu = None
-        else:
-            self.motifbench_dir = None
+        # Import analysis modules from motif_scaffolding package
+        try:
+            from evaluation.motif_scaffolding.analysis import utils as au
+            from evaluation.motif_scaffolding.analysis import diversity as du
+            from evaluation.motif_scaffolding.analysis import novelty as nu
+            self.au = au
+            self.du = du
+            self.nu = nu
+        except ImportError as e:
+            self.logger.warning(f"Analysis modules not available: {e}")
             self.au = self.du = self.nu = None
+        
+        # Get internal paths for motif scaffolding resources
+        # Get the directory where this file is located
+        self._module_dir = Path(__file__).parent
+        self._motif_scaffolding_dir = self._module_dir / "motif_scaffolding"
+        
+        # Scripts directory (internal)
+        self._scripts_dir = self._motif_scaffolding_dir / "scripts"
+        
+        # Motif PDBs directory - can be configured or use default internal resources
+        if hasattr(config, 'motif_scaffolding') and hasattr(config.motif_scaffolding, 'motif_pdbs_dir'):
+            # Use configured path if provided
+            self.motif_pdbs_dir = Path(config.motif_scaffolding.motif_pdbs_dir)
+        else:
+            # Use default internal resources directory
+            self.motif_pdbs_dir = self._motif_scaffolding_dir / "resources" / "motif_pdbs"
+        
+        # Create resources directory if it doesn't exist
+        self.motif_pdbs_dir.mkdir(parents=True, exist_ok=True)
     
     def load_inputs(
         self,
@@ -90,7 +98,7 @@ class MotifBenchEvaluator(BaseEvaluator):
         """
         Generate motif_info.csv from scaffold_info.csv.
         
-        This uses MotifBench's script to convert scaffold_info to motif_info format.
+        This uses internal script to convert scaffold_info to motif_info format.
         """
         import subprocess
         import sys
@@ -99,20 +107,25 @@ class MotifBenchEvaluator(BaseEvaluator):
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         
-        if not self.motifbench_dir:
-            raise ValueError("MotifBench directory not configured")
-        
         motif_pdb_path = self.motif_pdbs_dir / f"{motif_name}.pdb"
         if not motif_pdb_path.exists():
-            raise FileNotFoundError(f"Motif PDB not found: {motif_pdb_path}")
+            raise FileNotFoundError(
+                f"Motif PDB not found: {motif_pdb_path}\n"
+                f"Please ensure motif PDB files are available in: {self.motif_pdbs_dir}\n"
+                f"Or configure 'motif_pdbs_dir' in your config file."
+            )
         
         motif_info_path = output_dir / "motif_info.csv"
         
-        script_path = self.motifbench_dir / "scripts" / "write_motifInfo_from_scaffoldInfo.py"
+        script_path = self._scripts_dir / "write_motifInfo_from_scaffoldInfo.py"
         if not script_path.exists():
             raise FileNotFoundError(f"Script not found: {script_path}")
         
-        python_path = self.config.motif_scaffolding.get("python_path") or sys.executable
+        python_path = None
+        if hasattr(self.config, 'motif_scaffolding') and hasattr(self.config.motif_scaffolding, 'python_path'):
+            python_path = self.config.motif_scaffolding.python_path
+        if not python_path:
+            python_path = sys.executable
         
         cmd = [
             python_path,
@@ -300,32 +313,73 @@ class MotifBenchEvaluator(BaseEvaluator):
         )
         
         # Calculate novelty
-        success_results = results_df[results_df['success'] == True]
+        novelty_value = 0.0
+        success_results = results_df[results_df['success'] == True].copy()
         if len(success_results) > 0:
-            novelty_results = self.nu.calculate_novelty(
-                input_csv=success_results,
-                foldseek_database_path=foldseek_db,
-                max_workers=4,
-                cpu_threshold=75.0
-            )
-            novelty_path = output_dir / "novelty_results.csv"
-            novelty_results.to_csv(novelty_path, index=False)
+            # Prepare dataframe for novelty calculation
+            # Novelty calculation expects 'backbone_path' column
+            novelty_input = success_results.copy()
+            if 'backbone_path' not in novelty_input.columns:
+                if 'refold_path' in novelty_input.columns:
+                    novelty_input['backbone_path'] = novelty_input['refold_path']
+                else:
+                    self.logger.warning("Cannot calculate novelty: missing refold_path column")
+                    novelty_input = None
+            
+            if novelty_input is not None and len(novelty_input) > 0:
+                try:
+                    novelty_results = self.nu.calculate_novelty(
+                        input_csv=novelty_input,
+                        foldseek_database_path=foldseek_db,
+                        max_workers=4,
+                        cpu_threshold=75.0
+                    )
+                    novelty_path = output_dir / "novelty_results.csv"
+                    novelty_results.to_csv(novelty_path, index=False)
+                    # Calculate mean novelty (pdbTM column)
+                    if 'pdbTM' in novelty_results.columns:
+                        # Filter out NaN values
+                        pdbTM_values = novelty_results['pdbTM'].dropna()
+                        if len(pdbTM_values) > 0:
+                            novelty_value = float(pdbTM_values.mean())
+                    elif 'novelty' in novelty_results.columns:
+                        novelty_values = novelty_results['novelty'].dropna()
+                        if len(novelty_values) > 0:
+                            novelty_value = float(novelty_values.mean())
+                except Exception as e:
+                    self.logger.warning(f"Failed to calculate novelty: {e}")
         
-        # Save summary
+        # Count unique solutions (unique successful backbones)
+        num_unique_solutions = len(set(successful_backbones))
+        
+        # Calculate success rate
+        success_rate = len(successful_backbones) / len(results_df) if len(results_df) > 0 else 0
+        
+        # Save summary (JSON format)
         summary = {
             'motif_name': motif_name,
             'total_samples': len(results_df),
             'successful_samples': len(successful_backbones),
-            'success_rate': len(successful_backbones) / len(results_df) if len(results_df) > 0 else 0,
+            'success_rate': success_rate,
             'diversity': diversity_result.get('Diversity', 0),
             'num_clusters': diversity_result.get('Clusters', 0),
-            'num_solutions': diversity_result.get('Samples', 0),
-            'alpha5_clusters': diversity_result.get('Alpha5_Clusters', 0)
+            'num_solutions': num_unique_solutions,
+            'alpha5_clusters': diversity_result.get('Alpha5_Clusters', 0),
+            'novelty': novelty_value
         }
         
         summary_path = output_dir / "summary.txt"
         with open(summary_path, 'w') as f:
             json.dump(summary, f, indent=2)
+        
+        # Generate esm_summary.txt (MotifBench format)
+        esm_summary_path = output_dir / "esm_summary.txt"
+        with open(esm_summary_path, 'w') as f:
+            f.write(f"Evaluated Protein | {motif_name}\n")
+            f.write(f"Number of Unique Solutions (unique successful backbones) | {num_unique_solutions}\n")
+            f.write(f"Novelty | {novelty_value:.4f}\n")
+            f.write(f"Success Rate | {success_rate * 100:.2f}\n")
+            f.write(f"Number of Scaffolds Evaluated | {len(results_df)}\n")
         
         self.logger.info(f"Evaluation complete: {summary}")
     

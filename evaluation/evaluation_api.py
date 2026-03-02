@@ -527,11 +527,13 @@ class Evaluation():
         
         def process_metrics_worker(refold_path: Path):
             try:
-                sample_name = refold_path.parent.name
+                # sample_name from CIF filename (e.g. h3-5-3_model.cif -> h3-5-3), not parent dir,
+                # so timestamped folders (h3-5-3_20260301_125913) map correctly to backbone h3-5-3.pdb
+                sample_name = refold_path.stem.replace("_model", "")
                 inverse_fold_path = os.path.join(pipeline_dir, "inverse_fold", "backbones", f"{sample_name}.pdb")
                 # trb_path = os.path.join(pipeline_dir, "formatted_designs", f"{sample_name.rsplit('-',1)[0]}.pkl")
-                summary_confidence_path = os.path.join(refold_path.parent, f"{refold_path.parent.name}_summary_confidences.json")
-                confidence_path = os.path.join(refold_path.parent, f"{refold_path.parent.name}_confidences.json")
+                summary_confidence_path = os.path.join(refold_path.parent, f"{sample_name}_summary_confidences.json")
+                confidence_path = os.path.join(refold_path.parent, f"{sample_name}_confidences.json")
                 
                 try:
                     ca_rmsd = RMSDCalculator.compute_protein_ca_rmsd(pred=str(refold_path), refold=inverse_fold_path)
@@ -587,11 +589,11 @@ class Evaluation():
         
         def process_metrics_worker(refold_path: Path):
             try:
-                sample_name = refold_path.parent.name
+                sample_name = refold_path.stem.replace("_model", "")
                 inverse_fold_path = os.path.join(pipeline_dir, "inverse_fold", "backbones", f"{sample_name}.pdb")
                 # trb_path = os.path.join(pipeline_dir, "formatted_designs", f"{sample_name.rsplit('-',1)[0]}.pkl")
-                summary_confidence_path = os.path.join(refold_path.parent, f"{refold_path.parent.name}_summary_confidences.json")
-                confidence_path = os.path.join(refold_path.parent, f"{refold_path.parent.name}_confidences.json")
+                summary_confidence_path = os.path.join(refold_path.parent, f"{sample_name}_summary_confidences.json")
+                confidence_path = os.path.join(refold_path.parent, f"{sample_name}_confidences.json")
                 
                 try:
                     ca_rmsd = RMSDCalculator.compute_protein_ca_rmsd(pred=str(refold_path), refold=inverse_fold_path)

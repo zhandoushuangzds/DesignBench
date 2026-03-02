@@ -1,5 +1,5 @@
 """
-Orchestrator for motif scaffolding evaluation in benchcore.
+Orchestrator for motif scaffolding evaluation in designbench.
 
 Handles design_dir layout (per-motif subdirs or single motif dir),
 optional Generator (RFD3/PPIFlow), and delegates to MotifBenchEvaluator.
@@ -8,6 +8,9 @@ from pathlib import Path
 from typing import Dict, List, Optional
 import shutil
 import pandas as pd
+import subprocess
+import sys
+import logging
 
 from evaluation import get_evaluator
 
@@ -81,6 +84,7 @@ class MotifScaffoldingEvaluation:
         self.model_name = model_name or getattr(
             config, "model_name", None
         ) or config.get("model_name")
+        self.logger = logging.getLogger(__name__)
 
     def run_motif_scaffolding_evaluation(
         self,
@@ -153,4 +157,61 @@ class MotifScaffoldingEvaluation:
             )
             results[motif_name] = out_dir
 
+        # Generate summary files after all evaluations complete
+        self._generate_summaries(pipeline_dir)
+
         return results
+    
+    def _generate_summaries(self, pipeline_dir: Path):
+        """
+        Generate summary files: summary_by_problem.csv and overall_summary.csv.
+        
+        Args:
+            pipeline_dir: Root output directory containing motif evaluation results
+        """
+        try:
+            script_path = Path(__file__).parent / "motif_scaffolding" / "scripts" / "write_summaries.py"
+            if not script_path.exists():
+                self.logger.warning(f"Summary script not found: {script_path}")
+                return
+            
+            python_path = None
+            if hasattr(self.config, 'motif_scaffolding') and hasattr(self.config.motif_scaffolding, 'python_path'):
+                python_path = self.config.motif_scaffolding.python_path
+            if not python_path:
+                python_path = sys.executable
+            
+            # Try to find test_cases.csv (optional)
+            test_cases_path = None
+            # Check common locations
+            possible_test_cases_paths = [
+                Path(__file__).parent.parent.parent / "Motif_Benchmark" / "MotifBench" / "test_cases.csv",
+                Path(__file__).parent / "motif_scaffolding" / "resources" / "test_cases.csv",
+            ]
+            for path in possible_test_cases_paths:
+                if path.exists():
+                    test_cases_path = path
+                    break
+            
+            cmd = [python_path, str(script_path), str(pipeline_dir)]
+            if test_cases_path:
+                cmd.extend(["--test-cases", str(test_cases_path)])
+            
+            self.logger.info("Generating summary files...")
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            
+            if result.returncode == 0:
+                self.logger.info("Summary files generated successfully")
+                if result.stdout:
+                    self.logger.info(result.stdout)
+            else:
+                self.logger.warning(f"Summary generation had warnings: {result.stderr}")
+                
+        except Exception as e:
+            self.logger.warning(f"Failed to generate summary files: {e}")
+            # Don't raise - summaries are optional

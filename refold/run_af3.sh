@@ -50,11 +50,16 @@ if [[ -n "$cache_dir" && "$cache_dir" != "None" && "$cache_dir" != "" ]]; then
     BIND_MOUNTS+=(-B "$cache_dir:$cache_dir")
 fi
 
+# Limit JAX GPU memory preallocation to reduce OOM risk (default 75%, use 0.6 for large structures)
+# https://jax.readthedocs.io/en/latest/gpu_memory_allocation.html
+export XLA_PYTHON_CLIENT_MEM_FRACTION="${XLA_PYTHON_CLIENT_MEM_FRACTION:-0.6}"
+
 # Execute AlphaFold3 using apptainer
 apptainer exec \
     --nv \
     --writable-tmpfs \
     --env NVIDIA_VISIBLE_DEVICES=all \
+    --env XLA_PYTHON_CLIENT_MEM_FRACTION="$XLA_PYTHON_CLIENT_MEM_FRACTION" \
     --env PROMPT_COMMAND= \
     "${BIND_MOUNTS[@]}" \
     "$AF3_BASE/af3.sif" \
